@@ -77,7 +77,8 @@ export default function QuestionCard({ question, initialSaved = false, isAdmin =
       } else {
         await supabase
           .from('saved_questions')
-          .insert({ user_id: user.id, question_id: question.id })
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .insert({ user_id: user.id, question_id: question.id } as any)
       }
       setSaved(prev => !prev)
     })
