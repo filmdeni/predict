@@ -217,7 +217,7 @@ export default function QuestionPage() {
               >
                 <span className="font-semibold">{opt.label}</span>
                 <span className={`text-sm font-medium ${selected ? 'text-gray-300' : 'text-gray-400'}`}>
-                  {odds > 0 ? `${odds.toFixed(2)}x` : 'N/A'}
+                  {odds > 0 ? `${odds.toFixed(2)}x` : `${(100 / options.length).toFixed(0)}%`}
                 </span>
               </button>
             )
@@ -240,7 +240,7 @@ export default function QuestionPage() {
       {success && (
         <div className="bg-green-50 border border-green-200 rounded-2xl p-6 text-center space-y-2">
           <div className="text-4xl">🎯</div>
-          <p className="text-green-700 font-bold text-lg">วางเดิมพันแล้ว!</p>
+          <p className="text-green-700 font-bold text-lg">ทายแล้ว! ลุ้นได้เลย 🔮</p>
           <p className="text-green-600 text-sm">รอลุ้นผล และรับการแจ้งเตือนเมื่อเฉลย</p>
         </div>
       )}

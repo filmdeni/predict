@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2, CheckCircle2, Clock, Users } from 'lucide-react'
+import { Plus, Trash2, CheckCircle2, Clock, Users, ThumbsUp, ThumbsDown } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
 
 type Question = Database['public']['Tables']['questions']['Row'] & {
@@ -13,9 +13,11 @@ type Question = Database['public']['Tables']['questions']['Row'] & {
 const ADMIN_EMAIL = 'zwwzww19192@gmail.com'
 
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
+  pending:  { label: 'รออนุมัติ',  color: 'bg-blue-100 text-blue-700' },
   open:     { label: 'เปิดรับ',    color: 'bg-emerald-100 text-emerald-700' },
   closed:   { label: 'ปิดรับแล้ว', color: 'bg-amber-100 text-amber-700' },
   resolved: { label: 'เฉลยแล้ว',  color: 'bg-gray-100 text-gray-500' },
+  cancelled:{ label: 'ยกเลิก',    color: 'bg-red-100 text-red-500' },
 }
 
 export default function AdminQuestionsPage() {
@@ -24,7 +26,7 @@ export default function AdminQuestionsPage() {
 
   const [questions, setQuestions] = useState<Question[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'open' | 'closed' | 'resolved'>('open')
+  const [tab, setTab] = useState<'pending' | 'open' | 'closed' | 'resolved'>('pending')
   const [selected, setSelected] = useState<Record<string, string>>({})
   const [resolving, setResolving] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -80,7 +82,22 @@ export default function AdminQuestionsPage() {
     setConfirmDelete(null)
   }
 
+  async function approvePending(questionId: string) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from('questions') as any).update({ status: 'open' }).eq('id', questionId)
+    if (error) { alert('Error: ' + error.message); return }
+    setQuestions(q => q.map(x => x.id === questionId ? { ...x, status: 'open' } : x))
+  }
+
+  async function rejectPending(questionId: string) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from('questions') as any).update({ status: 'cancelled' }).eq('id', questionId)
+    if (error) { alert('Error: ' + error.message); return }
+    setQuestions(q => q.map(x => x.id === questionId ? { ...x, status: 'cancelled' } : x))
+  }
+
   const tabs = [
+    { key: 'pending' as const,  label: 'รออนุมัติ' },
     { key: 'open' as const,     label: 'เปิดรับ' },
     { key: 'closed' as const,   label: 'ปิดแล้ว' },
     { key: 'resolved' as const, label: 'เฉลยแล้ว' },
@@ -105,7 +122,7 @@ export default function AdminQuestionsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-2">
         {tabs.map(t => (
           <button
             key={t.key}
@@ -228,7 +245,24 @@ export default function AdminQuestionsPage() {
                     })}
                   </div>
 
-                  {q.status !== 'resolved' && (
+                  {q.status === 'pending' && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => rejectPending(q.id)}
+                        className="flex-1 py-2.5 flex items-center justify-center gap-2 border border-red-200 text-red-500 hover:bg-red-50 text-sm font-semibold rounded-xl transition-colors"
+                      >
+                        <ThumbsDown size={14} /> ปฏิเสธ
+                      </button>
+                      <button
+                        onClick={() => approvePending(q.id)}
+                        className="flex-1 py-2.5 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-colors"
+                      >
+                        <ThumbsUp size={14} /> อนุมัติ
+                      </button>
+                    </div>
+                  )}
+
+                  {q.status !== 'resolved' && q.status !== 'pending' && (
                     <button
                       onClick={() => resolve(q.id)}
                       disabled={!selected[q.id] || resolving === q.id}

@@ -26,6 +26,42 @@ function formatPool(n: number): string {
   return `${n}`
 }
 
+function ArcGauge({ pct }: { pct: number }) {
+  const W = 72
+  const H = 72
+  const stroke = 7
+  const cx = W / 2
+  const cy = W / 2
+  const r = (W - stroke) / 2
+
+  // 220° arc opening at the bottom: from 140° to 360°+40° (clockwise from top=0°)
+  const startDeg = 145
+  const endDeg   = 395   // = 145 + 250  … gives a wider horseshoe
+
+  function pt(deg: number) {
+    const rad = ((deg - 90) * Math.PI) / 180
+    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) }
+  }
+  function arc(a: number, b: number) {
+    const s = pt(a), e = pt(b)
+    const large = b - a > 180 ? 1 : 0
+    return `M${s.x} ${s.y} A${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`
+  }
+
+  const fillEnd = startDeg + (endDeg - startDeg) * Math.min(pct / 100, 1)
+
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
+      <path d={arc(startDeg, endDeg)} fill="none" stroke="#e5e7eb" strokeWidth={stroke} strokeLinecap="round" />
+      {pct > 0 && (
+        <path d={arc(startDeg, fillEnd)} fill="none" stroke="#f59e0b" strokeWidth={stroke} strokeLinecap="round" />
+      )}
+      <text x={cx} y={cy - 2}  textAnchor="middle" fontSize="14" fontWeight="700" fill="#111827">{pct.toFixed(0)}%</text>
+      <text x={cx} y={cy + 12} textAnchor="middle" fontSize="10" fill="#9ca3af">โอกาส</text>
+    </svg>
+  )
+}
+
 interface Props {
   question: Question
   initialSaved?: boolean
@@ -131,10 +167,7 @@ export default function QuestionCard({ question, initialSaved = false, isAdmin =
         <div className="flex-1">
           {isBinary ? (
             <div className="flex items-center justify-between">
-              <div>
-                <span className="text-2xl font-bold text-gray-900">{topPct.toFixed(0)}%</span>
-                <span className="text-xs text-gray-500 ml-1">โอกาส</span>
-              </div>
+              <ArcGauge pct={topPct} />
               <div className="flex gap-1.5">
                 <button className="px-3 py-1 bg-green-50 border border-green-200 text-green-700 text-xs font-semibold rounded-lg hover:bg-green-100 transition-colors">
                   ใช่

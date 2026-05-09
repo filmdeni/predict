@@ -36,7 +36,16 @@ interface ReferralNotif {
   createdAt: string
 }
 
-type Notif = PredictionNotif | ReplyNotif | ReferralNotif
+interface QuestionStatusNotif {
+  kind: 'question_approved' | 'question_rejected'
+  id: string
+  message: string
+  questionId: string
+  read: boolean
+  createdAt: string
+}
+
+type Notif = PredictionNotif | ReplyNotif | ReferralNotif | QuestionStatusNotif
 
 export default function NotificationBell() {
   const supabase = createClient()
@@ -77,6 +86,19 @@ export default function NotificationBell() {
           { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${data.user.id}` },
           async (payload) => {
             const n = payload.new
+            if (n.type === 'question_approved' || n.type === 'question_rejected') {
+              const notif: QuestionStatusNotif = {
+                kind: n.type,
+                id: n.id,
+                message: n.message ?? '',
+                questionId: n.question_id ?? '',
+                read: false,
+                createdAt: n.created_at,
+              }
+              setNotifs(prev => [notif, ...prev])
+              setUnread(u => u + 1)
+              return
+            }
             const { data: comment } = await supabase
               .from('comments')
               .select('body, question_id, users(display_name)')
@@ -116,7 +138,7 @@ export default function NotificationBell() {
         .from('notifications')
         .select('id, type, read, created_at, message, coins_gained, question_id, comment_id, comments(body, question_id, users(display_name))')
         .eq('user_id', userId)
-        .in('type', ['reply', 'referral'])
+        .in('type', ['reply', 'referral', 'question_approved', 'question_rejected'])
         .order('created_at', { ascending: false })
         .limit(20),
     ])
@@ -131,13 +153,23 @@ export default function NotificationBell() {
       resolvedAt: p.resolved_at,
     }))
 
-    const dbNotifs: (ReplyNotif | ReferralNotif)[] = (replyRes.data ?? []).map((n: any) => {
+    const dbNotifs: (ReplyNotif | ReferralNotif | QuestionStatusNotif)[] = (replyRes.data ?? []).map((n: any) => {
       if (n.type === 'referral') {
         return {
           kind: 'referral' as const,
           id: n.id,
           message: n.message ?? 'มีคนมาทายจากลิงก์ของคุณ!',
           coinsGained: n.coins_gained ?? 100,
+          questionId: n.question_id ?? '',
+          read: n.read,
+          createdAt: n.created_at,
+        }
+      }
+      if (n.type === 'question_approved' || n.type === 'question_rejected') {
+        return {
+          kind: n.type as 'question_approved' | 'question_rejected',
+          id: n.id,
+          message: n.message ?? '',
           questionId: n.question_id ?? '',
           read: n.read,
           createdAt: n.created_at,
@@ -220,7 +252,15 @@ export default function NotificationBell() {
                           </div>
                           {!n.read && <span className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0 mt-1" />}
                         </>
-                      ) : (
+                      ) : n.kind === 'question_approved' || n.kind === 'question_rejected' ? (
+                        <>
+                          <span className="text-lg mt-0.5">{n.kind === 'question_approved' ? '🎉' : '❌'}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-gray-900 font-medium">{n.message}</p>
+                          </div>
+                          {!n.read && <span className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0 mt-1" />}
+                        </>
+                      ) : n.kind === 'reply' ? (
                         <>
                           <span className="text-lg mt-0.5">💬</span>
                           <div className="flex-1 min-w-0">
@@ -231,7 +271,7 @@ export default function NotificationBell() {
                           </div>
                           {!n.read && <span className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0 mt-1" />}
                         </>
-                      )}
+                      ) : null}
                     </div>
                   </Link>
                 ))
