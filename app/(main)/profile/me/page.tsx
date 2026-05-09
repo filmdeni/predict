@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
-import { LogOut, Trophy, Target, Flame, Coins } from 'lucide-react'
+import { LogOut, Trophy, Target, Flame, Coins, BookOpen } from 'lucide-react'
 
 type UserProfile = Database['public']['Tables']['users']['Row']
 type Prediction = Database['public']['Tables']['predictions']['Row'] & {
@@ -115,6 +116,18 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* How to play */}
+      <Link
+        href="/how-to-play"
+        className="flex items-center gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-3.5 shadow-sm hover:border-gray-300 transition-colors"
+      >
+        <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center">
+          <BookOpen size={16} className="text-indigo-500" />
+        </div>
+        <span className="flex-1 text-sm font-medium text-gray-700">วิธีเล่น ภาวนา</span>
+        <span className="text-gray-400 text-xs">→</span>
+      </Link>
 
       {/* Prediction history */}
       <div>
