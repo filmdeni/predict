@@ -28,6 +28,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let channel: ReturnType<typeof supabase.channel> | null = null
+
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
@@ -44,8 +46,18 @@ export default function ProfilePage() {
       setProfile(prof as unknown as UserProfile)
       setPredictions((preds ?? []) as Prediction[])
       setLoading(false)
+
+      channel = supabase
+        .channel(`profile-coins:${user.id}:${Date.now()}`)
+        .on('postgres_changes', {
+          event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${user.id}`
+        }, (payload) => {
+          setProfile(prev => prev ? { ...prev, ...(payload.new as UserProfile) } : prev)
+        })
+        .subscribe()
     }
     load()
+    return () => { if (channel) supabase.removeChannel(channel) }
   }, [])
 
   async function signOut() {
