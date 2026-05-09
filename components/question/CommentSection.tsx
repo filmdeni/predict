@@ -38,6 +38,7 @@ export default function CommentSection({ questionId }: { questionId: string }) {
         .order('created_at', { ascending: true })
         .limit(100)
       setComments((data ?? []) as Comment[])
+      console.log('comment user_ids:', (data ?? []).map((c: Comment) => c.user_id))
     }
     load()
 
