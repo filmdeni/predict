@@ -83,7 +83,8 @@ export default function CommentSection({ questionId }: { questionId: string }) {
   }
 
   async function deleteComment(id: string) {
-    await supabase.from('comments').delete().eq('id', id)
+    const { error } = await supabase.from('comments').delete().eq('id', id)
+    if (error) console.error('delete error:', error)
   }
 
   async function submit(e: React.FormEvent) {
