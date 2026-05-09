@@ -25,10 +25,7 @@ export default function CommentSection({ questionId }: { questionId: string }) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user)
-      console.log('current user id:', data.user?.id)
-    })
+    supabase.auth.getUser().then(({ data }) => setUser(data.user))
 
     async function load() {
       const { data } = await supabase
@@ -38,7 +35,6 @@ export default function CommentSection({ questionId }: { questionId: string }) {
         .order('created_at', { ascending: true })
         .limit(100)
       setComments((data ?? []) as Comment[])
-      console.log('comment user_ids:', (data ?? []).map((c: Comment) => c.user_id))
     }
     load()
 
@@ -83,8 +79,14 @@ export default function CommentSection({ questionId }: { questionId: string }) {
   }
 
   async function deleteComment(id: string) {
+    setComments(prev => prev.filter(c => c.id !== id))
     const { error } = await supabase.from('comments').delete().eq('id', id)
-    if (error) console.error('delete error:', error)
+    if (error) {
+      console.error('delete error:', error)
+      // rollback
+      const { data } = await supabase.from('comments').select('*, users(display_name, username)').eq('id', id).single()
+      if (data) setComments(prev => [...prev, data as Comment].sort((a, b) => a.created_at.localeCompare(b.created_at)))
+    }
   }
 
   async function submit(e: React.FormEvent) {
@@ -124,11 +126,7 @@ export default function CommentSection({ questionId }: { questionId: string }) {
 
       {/* comments list */}
       <div className="space-y-2 max-h-96 overflow-y-auto">
-        {/* debug */}
-        {process.env.NODE_ENV === 'development' && user && (
-          <p className="text-xs text-blue-400">logged in as: {user.id}</p>
-        )}
-        {topLevel.length === 0 ? (
+{topLevel.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-6">ยังไม่มีความคิดเห็น เป็นคนแรกได้เลย</p>
         ) : (
           topLevel.map(c => (
