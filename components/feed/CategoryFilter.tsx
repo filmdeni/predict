@@ -6,6 +6,7 @@ const CATEGORIES = [
   { slug: 'esports',  name: 'eSports' },
   { slug: 'stock',    name: 'หุ้น' },
   { slug: 'politics', name: 'การเมือง' },
+  { slug: 'sports',   name: 'กีฬา' },
   { slug: 'viral',    name: 'ไวรัล' },
   { slug: 'crypto',   name: 'Crypto' },
 ]
