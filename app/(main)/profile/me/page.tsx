@@ -8,7 +8,7 @@ import { LogOut, Trophy, Target, Flame, Coins } from 'lucide-react'
 
 type UserProfile = Database['public']['Tables']['users']['Row']
 type Prediction = Database['public']['Tables']['predictions']['Row'] & {
-  questions: { title: string; options: { id: string; label: string }[] } | null
+  questions: { id: string; title: string; options: { id: string; label: string }[] } | null
 }
 
 const RANK_COLOR: Record<string, string> = {
@@ -35,7 +35,7 @@ export default function ProfilePage() {
         supabase.from('users').select('*').eq('id', user.id).single(),
         supabase
           .from('predictions')
-          .select('*, questions(title, options)')
+          .select('*, questions(id, title, options)')
           .eq('user_id', user.id)
           .order('placed_at', { ascending: false })
           .limit(20),
@@ -89,8 +89,11 @@ export default function ProfilePage() {
 
         {/* Coins */}
         <div className="mt-4 bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
-          <span className="text-sm text-gray-500">เหรียญของฉัน</span>
-          <span className="text-xl font-bold text-gray-900">🪙 {profile.coins.toLocaleString()}</span>
+          <span className="text-sm text-gray-500">คะแนนของฉัน</span>
+          <span className="text-xl font-bold text-gray-900 flex items-center gap-1.5">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-xs leading-none">P</span>
+            {profile.coins.toLocaleString()}
+          </span>
         </div>
 
         {/* Stats */}
@@ -133,15 +136,19 @@ export default function ProfilePage() {
               const statusText = p.is_correct === null ? 'รอผล' : p.is_correct ? 'ถูก ✓' : 'ผิด ✗'
 
               return (
-                <div key={p.id} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3">
+                <div
+                  key={p.id}
+                  onClick={() => p.questions?.id && router.push(`/question/${p.questions.id}`)}
+                  className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3 cursor-pointer hover:border-gray-300 transition-colors"
+                >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 line-clamp-1">{p.questions?.title ?? '—'}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">ทาย: <span className="text-gray-600 font-medium">{optLabel}</span> · {p.coins_wagered.toLocaleString()} 🪙</p>
+                    <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">ทาย: <span className="text-gray-600 font-medium">{optLabel}</span> · <span className="inline-flex items-center gap-0.5"><span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[8px] leading-none">P</span>{p.coins_wagered.toLocaleString()} คะแนน</span></p>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColor}`}>{statusText}</span>
                     {p.coins_won !== null && p.coins_won > 0 && (
-                      <span className="text-xs text-green-600 font-medium">+{p.coins_won.toLocaleString()} 🪙</span>
+                      <span className="text-xs text-green-600 font-medium flex items-center gap-0.5">+<span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[8px] leading-none">P</span>{p.coins_won.toLocaleString()} คะแนน</span>
                     )}
                   </div>
                 </div>

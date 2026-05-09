@@ -97,7 +97,7 @@ export default function CommentSection({ questionId }: { questionId: string }) {
       question_id: questionId,
       user_id: user.id,
       body: body.trim(),
-      parent_id: replyTo?.id ?? null,
+      parent_id: replyTo ? (replyTo.parent_id ?? replyTo.id) : null,
     } as never)
     setBody('')
     setReplyTo(null)
@@ -141,12 +141,14 @@ export default function CommentSection({ questionId }: { questionId: string }) {
                     <span className="text-xs text-gray-400">{timeAgo(c.created_at)}</span>
                     {user && (
                       <div className="flex items-center gap-2">
+                        {user.id !== c.user_id && (
                         <button
                           onClick={() => handleReply(c)}
                           className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
                         >
                           ตอบกลับ
                         </button>
+                        )}
                         {user.id === c.user_id && (
                           <button
                             onClick={() => deleteComment(c.id)}
@@ -173,6 +175,14 @@ export default function CommentSection({ questionId }: { questionId: string }) {
                       </span>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-400">{timeAgo(r.created_at)}</span>
+                        {user && user.id !== r.user_id && (
+                          <button
+                            onClick={() => handleReply(r)}
+                            className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
+                          >
+                            ตอบกลับ
+                          </button>
+                        )}
                         {user?.id === r.user_id && (
                           <button
                             onClick={() => deleteComment(r.id)}

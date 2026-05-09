@@ -40,18 +40,25 @@ export default function PlacePredictionModal({ question, optionId, onClose, onSu
         return
       }
 
+      const refKey = `ref:${question.id}`
+      const referredBy = localStorage.getItem(refKey)
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: rpcError } = await (supabase as any).rpc('place_prediction', {
         p_question_id: question.id,
         p_user_id: user.id,
         p_option_id: optionId,
         p_coins: coins,
+        p_referred_by: referredBy ?? null,
       })
 
+      if (!rpcError) localStorage.removeItem(refKey)
+
       if (rpcError) {
-        if (rpcError.message.includes('insufficient_coins')) setError('เหรียญไม่พอ')
-        else if (rpcError.message.includes('question_not_available')) setError('คำถามนี้ปิดรับแล้ว')
-        else if (rpcError.message.includes('unique')) setError('คุณทายคำถามนี้ไปแล้ว')
+        const msg = rpcError.message ?? ''
+        if (msg.includes('insufficient_coins')) setError('คะแนนไม่พอ')
+        else if (msg.includes('question_not_available')) setError('คำถามนี้ปิดรับแล้ว')
+        else if (msg.includes('unique') || msg.includes('duplicate') || msg.includes('already')) setError('คุณทายคำถามนี้ไปแล้ว')
         else setError('เกิดข้อผิดพลาด ลองใหม่อีกครั้ง')
         setLoading(false)
         return
@@ -72,7 +79,7 @@ export default function PlacePredictionModal({ question, optionId, onClose, onSu
       >
         {/* header */}
         <div className="flex items-center justify-between">
-          <h2 className="font-bold text-gray-900 text-lg">วางการทาย</h2>
+          <h2 className="font-bold text-gray-900 text-lg">ยืนยันการทาย</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-900 transition-colors">
             <X size={20} />
           </button>
@@ -81,11 +88,11 @@ export default function PlacePredictionModal({ question, optionId, onClose, onSu
         {/* selected option + price */}
         <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between">
           <div>
-            <p className="text-xs text-gray-400 mb-0.5">คำตอบที่เลือก</p>
+            <p className="text-xs text-gray-400 mb-0.5">คำทายของคุณ</p>
             <p className="text-gray-900 font-semibold">{option?.label}</p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-gray-400 mb-0.5">ราคา (โอกาส)</p>
+            <p className="text-xs text-gray-400 mb-0.5">โอกาสชนะ</p>
             <p className="text-gray-900 font-bold">{pricePct}%</p>
           </div>
         </div>
@@ -93,8 +100,11 @@ export default function PlacePredictionModal({ question, optionId, onClose, onSu
         {/* coin slider */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">จำนวนเหรียญ</span>
-            <span className="text-gray-900 font-bold text-lg">{coins.toLocaleString()} 🪙</span>
+            <span className="text-sm text-gray-500">คะแนนที่ใช้ทาย</span>
+            <span className="text-gray-900 font-bold text-lg flex items-center gap-1.5">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[10px] leading-none">P</span>
+              {coins.toLocaleString()}
+            </span>
           </div>
           <input
             type="range"
@@ -125,15 +135,19 @@ export default function PlacePredictionModal({ question, optionId, onClose, onSu
         {/* payout estimate */}
         <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 space-y-1.5">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">ถ้าถูก ได้รับ</span>
-            <span className="text-green-600 font-bold text-lg">{payout.toLocaleString()} 🪙</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-400">กำไร</span>
-            <span className="text-xs font-semibold text-green-600">
-              +{(payout - coins).toLocaleString()} 🪙 ({gainPct > 0 ? '+' : ''}{gainPct}%)
+            <span className="text-sm text-gray-500">คะแนนที่จะได้รับ <span className="text-gray-400 font-normal">(ประมาณ)</span></span>
+            <span className="text-green-600 font-bold text-lg flex items-center gap-1.5">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[10px] leading-none">P</span>
+              ~{payout.toLocaleString()} คะแนน
             </span>
           </div>
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-gray-400">คะแนนที่เพิ่มขึ้น</span>
+            <span className="text-xs font-semibold text-green-600">
+              ~+{(payout - coins).toLocaleString()} คะแนน ({gainPct > 0 ? '+' : ''}{gainPct}%)
+            </span>
+          </div>
+          <p className="text-xs text-gray-400 pt-1 border-t border-green-100">รางวัลจริงขึ้นอยู่กับจำนวนผู้ร่วมทายทั้งหมด</p>
         </div>
 
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
@@ -142,9 +156,10 @@ export default function PlacePredictionModal({ question, optionId, onClose, onSu
         <button
           onClick={submit}
           disabled={loading}
-          className="w-full py-4 bg-gray-900 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all active:scale-[0.98]"
+          className="w-full py-4 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all active:scale-[0.98]"
+          style={{ background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' }}
         >
-          {loading ? 'กำลังส่ง...' : `ยืนยัน — ภาวนา! 🎯`}
+          {loading ? 'กำลังส่ง...' : 'ยืนยันการทาย'}
         </button>
       </div>
     </div>

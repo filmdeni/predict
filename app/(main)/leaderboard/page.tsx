@@ -26,7 +26,7 @@ export default function LeaderboardPage() {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const orderCol = tab === 'reputation' ? 'reputation' : tab === 'winrate' ? 'correct_predictions' : 'win_streak'
+      const orderCol = tab === 'reputation' ? 'coins' : tab === 'winrate' ? 'correct_predictions' : 'win_streak'
       const { data } = await supabase
         .from('users')
         .select('*')
@@ -74,7 +74,7 @@ export default function LeaderboardPage() {
       ) : (
         <div className="space-y-2">
           {users.map((u, i) => {
-            const value = tab === 'reputation' ? `${u.reputation.toLocaleString()} rep`
+            const value = tab === 'reputation' ? `${u.coins.toLocaleString()} P`
               : tab === 'winrate' ? `${u.correct_predictions}/${u.total_predictions} ถูก`
               : `${u.win_streak} streak`
 

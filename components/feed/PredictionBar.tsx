@@ -1,4 +1,5 @@
 import { getPoolShares } from '@/lib/game/odds'
+import { PointIcon } from '@/components/PointBadge'
 import type { QuestionOption } from '@/lib/supabase/types'
 
 interface Props {
@@ -37,7 +38,7 @@ export default function PredictionBar({ options, pool, totalPool }: Props) {
           </div>
         ))}
         {totalPool > 0 && (
-          <span className="text-xs text-gray-500">{totalPool.toLocaleString()} 🪙</span>
+          <span className="text-xs text-gray-500 flex items-center gap-1"><PointIcon size={14} />{totalPool.toLocaleString()} คะแนน</span>
         )}
       </div>
     </div>

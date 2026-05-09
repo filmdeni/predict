@@ -4,23 +4,50 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Search, SlidersHorizontal, Bookmark, LogOut } from 'lucide-react'
+import { Search, Bookmark } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 import SearchModal from './SearchModal'
 import NotificationBell from './NotificationBell'
 
 export default function Header() {
   const [user, setUser] = useState<User | null>(null)
+  const [coins, setCoins] = useState<number | null>(null)
   const [showSearch, setShowSearch] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    let channel: ReturnType<typeof supabase.channel> | null = null
+
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return
+      setUser(data.user)
+      const { data: profile } = await supabase
+        .from('users')
+        .select('coins')
+        .eq('id', data.user.id)
+        .single()
+      if (profile) setCoins((profile as { coins: number }).coins)
+
+      channel = supabase
+        .channel(`header-coins:${data.user.id}:${Date.now()}`)
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${data.user.id}` },
+          (payload) => { setCoins((payload.new as { coins: number }).coins) }
+        )
+        .subscribe()
+    })
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setUser(session?.user ?? null)
+      if (!session?.user) setCoins(null)
     })
-    return () => subscription.unsubscribe()
+
+    return () => {
+      subscription.unsubscribe()
+      if (channel) supabase.removeChannel(channel)
+    }
   }, [])
 
   async function signOut() {
@@ -45,16 +72,17 @@ export default function Header() {
 
         {user ? (
           <div className="flex items-center gap-2 ml-1">
-            <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-sm font-semibold text-green-700">
-              {(user.user_metadata?.full_name ?? user.email ?? '?')[0].toUpperCase()}
-            </div>
-            <button
-              onClick={signOut}
-              className="p-1.5 text-gray-400 hover:text-gray-900 transition-colors"
-              title="ออกจากระบบ"
-            >
-              <LogOut size={16} />
-            </button>
+            {coins !== null && (
+              <Link href="/profile/me" className="flex items-center gap-1.5 bg-gray-100 rounded-full px-3 py-1.5 hover:bg-gray-200 transition-colors">
+                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[9px] leading-none flex-shrink-0">P</span>
+                <span className="text-sm font-semibold text-gray-800 tabular-nums">{coins.toLocaleString()}</span>
+              </Link>
+            )}
+            <Link href="/profile/me">
+              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-sm font-semibold text-green-700">
+                {(user.user_metadata?.full_name ?? user.email ?? '?')[0].toUpperCase()}
+              </div>
+            </Link>
           </div>
         ) : (
           <Link href="/login" className="ml-1 text-sm bg-gray-900 text-white px-3 py-1.5 rounded-full font-medium hover:bg-gray-700 transition-colors">

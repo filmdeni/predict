@@ -104,6 +104,11 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['coin_transactions']['Row'], 'id' | 'created_at'>
         Update: never
       }
+      saved_questions: {
+        Row: { id: number; user_id: string; question_id: string; created_at: string }
+        Insert: { user_id: string; question_id: string }
+        Update: never
+      }
     }
     Functions: {
       place_prediction: {

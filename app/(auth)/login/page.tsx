@@ -20,7 +20,7 @@ function LoginForm() {
     setError(null)
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? location.origin}/auth/callback?next=${next}` },
+      options: { emailRedirectTo: `${location.origin}/auth/callback?next=${next}` },
     })
     setLoading(false)
     if (error) setError(error.message)
@@ -28,10 +28,9 @@ function LoginForm() {
   }
 
   async function handleGoogle() {
-    const base = process.env.NEXT_PUBLIC_SITE_URL ?? location.origin
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${base}/auth/callback?next=${next}` },
+      options: { redirectTo: `${location.origin}/auth/callback?next=${next}` },
     })
   }
 

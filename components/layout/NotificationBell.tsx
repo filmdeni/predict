@@ -26,7 +26,17 @@ interface ReplyNotif {
   createdAt: string
 }
 
-type Notif = PredictionNotif | ReplyNotif
+interface ReferralNotif {
+  kind: 'referral'
+  id: string
+  message: string
+  coinsGained: number
+  questionId: string
+  read: boolean
+  createdAt: string
+}
+
+type Notif = PredictionNotif | ReplyNotif | ReferralNotif
 
 export default function NotificationBell() {
   const supabase = createClient()
@@ -42,7 +52,7 @@ export default function NotificationBell() {
       loadNotifs(data.user.id)
 
       const channel = supabase
-        .channel(`notifs:${data.user.id}`)
+        .channel(`notifs:${data.user.id}:${Date.now()}`)
         .on(
           'postgres_changes',
           { event: 'UPDATE', schema: 'public', table: 'predictions', filter: `user_id=eq.${data.user.id}` },
@@ -104,11 +114,11 @@ export default function NotificationBell() {
         .limit(10),
       supabase
         .from('notifications')
-        .select('id, read, created_at, comment_id, comments(body, question_id, users(display_name))')
+        .select('id, type, read, created_at, message, coins_gained, question_id, comment_id, comments(body, question_id, users(display_name))')
         .eq('user_id', userId)
-        .eq('type', 'reply')
+        .in('type', ['reply', 'referral'])
         .order('created_at', { ascending: false })
-        .limit(10),
+        .limit(20),
     ])
 
     const predictions: PredictionNotif[] = (predRes.data ?? []).map((p: any) => ({
@@ -121,29 +131,43 @@ export default function NotificationBell() {
       resolvedAt: p.resolved_at,
     }))
 
-    const replies: ReplyNotif[] = (replyRes.data ?? []).map((n: any) => ({
-      kind: 'reply',
-      id: n.id,
-      actorName: n.comments?.users?.display_name ?? 'ใครบางคน',
-      commentBody: n.comments?.body ?? '',
-      questionId: n.comments?.question_id ?? '',
-      read: n.read,
-      createdAt: n.created_at,
-    }))
+    const dbNotifs: (ReplyNotif | ReferralNotif)[] = (replyRes.data ?? []).map((n: any) => {
+      if (n.type === 'referral') {
+        return {
+          kind: 'referral' as const,
+          id: n.id,
+          message: n.message ?? 'มีคนมาทายจากลิงก์ของคุณ!',
+          coinsGained: n.coins_gained ?? 100,
+          questionId: n.question_id ?? '',
+          read: n.read,
+          createdAt: n.created_at,
+        }
+      }
+      return {
+        kind: 'reply' as const,
+        id: n.id,
+        actorName: n.comments?.users?.display_name ?? 'ใครบางคน',
+        commentBody: n.comments?.body ?? '',
+        questionId: n.comments?.question_id ?? '',
+        read: n.read,
+        createdAt: n.created_at,
+      }
+    })
 
-    const all = [...predictions, ...replies].sort((a, b) => {
+    const all = [...predictions, ...dbNotifs].sort((a, b) => {
       const aDate = a.kind === 'prediction' ? a.resolvedAt : a.createdAt
       const bDate = b.kind === 'prediction' ? b.resolvedAt : b.createdAt
       return new Date(bDate).getTime() - new Date(aDate).getTime()
     })
 
     setNotifs(all)
-    setUnread(replies.filter(r => !r.read).length)
+    setUnread(dbNotifs.filter(r => !r.read).length)
   }
 
   async function markRepliesRead() {
     if (!user) return
-    await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false)
     setUnread(0)
   }
 
@@ -183,9 +207,18 @@ export default function NotificationBell() {
                           <div className="flex-1 min-w-0">
                             <p className="text-xs text-gray-900 font-medium line-clamp-2">{n.questionTitle}</p>
                             <p className={`text-xs mt-0.5 font-semibold ${n.isCorrect ? 'text-green-600' : 'text-gray-400'}`}>
-                              {n.isCorrect ? `ถูก! +${n.coinsWon.toLocaleString()} 🪙` : 'ทายผิด'}
+                              {n.isCorrect ? `ถูก! +${n.coinsWon.toLocaleString()} คะแนน` : 'ทายผิด'}
                             </p>
                           </div>
+                        </>
+                      ) : n.kind === 'referral' ? (
+                        <>
+                          <span className="text-lg mt-0.5">🔗</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-gray-900 font-medium">{n.message}</p>
+                            <p className="text-xs text-amber-600 font-semibold mt-0.5">+{n.coinsGained} คะแนน</p>
+                          </div>
+                          {!n.read && <span className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0 mt-1" />}
                         </>
                       ) : (
                         <>

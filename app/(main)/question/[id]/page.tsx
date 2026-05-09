@@ -7,7 +7,7 @@ import PlacePredictionModal from '@/components/prediction/PlacePredictionModal'
 import CommentSection from '@/components/question/CommentSection'
 import type { Database } from '@/lib/supabase/types'
 import { getOdds, getPoolShares } from '@/lib/game/odds'
-import { ArrowLeft, Share2 } from 'lucide-react'
+import { ArrowLeft, Share2, Link2, Check } from 'lucide-react'
 
 type Question = Database['public']['Tables']['questions']['Row'] & {
   categories: { name_th: string; emoji: string }
@@ -29,6 +29,7 @@ export default function QuestionPage() {
   const router = useRouter()
   const [question, setQuestion] = useState<Question | null>(null)
   const [loading, setLoading] = useState(true)
+  const [copied, setCopied] = useState(false)
   const [selectedOption, setSelectedOption] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -38,6 +39,13 @@ export default function QuestionPage() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user))
   }, [])
+
+  // store ref param from URL into localStorage so PlacePredictionModal can use it
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const ref = params.get('ref')
+    if (ref) localStorage.setItem(`ref:${id}`, ref)
+  }, [id])
 
   useEffect(() => {
     async function load() {
@@ -98,20 +106,35 @@ export default function QuestionPage() {
         >
           <ArrowLeft size={16} /> กลับ
         </button>
-        <button
-          onClick={() => {
-            const url = window.location.href
-            if (navigator.share) {
-              navigator.share({ title: question.title, url })
-            } else {
-              navigator.clipboard.writeText(url)
-              alert('คัดลอกลิงก์แล้ว!')
-            }
-          }}
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
-        >
-          <Share2 size={16} /> แชร์
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={async () => {
+              const refUrl = user
+                ? `${window.location.origin}/question/${id}?ref=${user.id}`
+                : window.location.href
+              await navigator.clipboard.writeText(refUrl)
+              setCopied(true)
+              setTimeout(() => setCopied(false), 2000)
+            }}
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+          >
+            {copied ? <Check size={16} className="text-green-500" /> : <Link2 size={16} />}
+            {copied ? 'คัดลอกแล้ว!' : 'คัดลอกลิงก์'}
+          </button>
+          {typeof navigator !== 'undefined' && 'share' in navigator && (
+            <button
+              onClick={async () => {
+                const refUrl = user
+                  ? `${window.location.origin}/question/${id}?ref=${user.id}`
+                  : window.location.href
+                try { await navigator.share({ title: question.title, url: refUrl }) } catch { /* cancelled */ }
+              }}
+              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+            >
+              <Share2 size={16} /> แชร์
+            </button>
+          )}
+        </div>
       </div>
 
       {/* question card */}
@@ -159,20 +182,26 @@ export default function QuestionPage() {
                 </div>
               )
             })}
-            <span className="text-xs text-gray-400 ml-auto">{question.total_pool.toLocaleString()} 🪙</span>
+            <span className="text-xs text-gray-400 ml-auto flex items-center gap-1">
+                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[9px] leading-none flex-shrink-0">P</span>
+                {question.total_pool.toLocaleString()} คะแนน
+              </span>
           </div>
         </div>
 
         <div className="flex items-center gap-3 text-xs text-gray-400 pt-1 border-t border-gray-100">
-          <span>👥 {question.predictions_count} การทาย</span>
-          <span>🪙 pool {question.total_pool.toLocaleString()} เหรียญ</span>
+          <span>👥 {question.predictions_count} คนทาย</span>
+          <span className="flex items-center gap-1">
+            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[9px] leading-none flex-shrink-0">P</span>
+            {question.total_pool.toLocaleString()} คะแนน
+          </span>
         </div>
       </div>
 
       {/* Option buttons */}
       {isOpen && (
         <div className="space-y-2">
-          <p className="text-sm text-gray-500 font-medium">เลือกคำตอบของคุณ</p>
+          <p className="text-sm text-gray-500 font-medium">คุณคิดว่าผลจะเป็นอย่างไร?</p>
           {options.map((opt) => {
             const odds = getOdds(question.pool, opt.id)
             const selected = selectedOption === opt.id
@@ -200,18 +229,19 @@ export default function QuestionPage() {
       {isOpen && selectedOption && (
         <button
           onClick={() => user ? setShowModal(true) : router.push(`/login?next=/question/${id}`)}
-          className="w-full py-4 bg-gray-900 hover:bg-gray-700 active:scale-[0.98] text-white font-bold rounded-xl transition-all"
+          className="w-full py-4 active:scale-[0.98] text-white font-bold rounded-xl transition-all"
+          style={{ background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' }}
         >
-          {user ? 'ภาวนา! 🎯' : 'เข้าสู่ระบบเพื่อทาย →'}
+          {user ? '🙏 ภาวนา' : 'เข้าสู่ระบบเพื่อทาย →'}
         </button>
       )}
 
       {/* Success */}
       {success && (
         <div className="bg-green-50 border border-green-200 rounded-2xl p-6 text-center space-y-2">
-          <div className="text-4xl">🙏</div>
-          <p className="text-green-700 font-bold text-lg">ภาวนาแล้ว!</p>
-          <p className="text-green-600 text-sm">ขอให้โชคดี รอลุ้นผลได้เลย</p>
+          <div className="text-4xl">🎯</div>
+          <p className="text-green-700 font-bold text-lg">วางเดิมพันแล้ว!</p>
+          <p className="text-green-600 text-sm">รอลุ้นผล และรับการแจ้งเตือนเมื่อเฉลย</p>
         </div>
       )}
 
