@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Send, CornerDownRight } from 'lucide-react'
+import { Send, CornerDownRight, Trash2 } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 
 interface Comment {
@@ -25,7 +25,10 @@ export default function CommentSection({ questionId }: { questionId: string }) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user)
+      console.log('current user id:', data.user?.id)
+    })
 
     async function load() {
       const { data } = await supabase
@@ -52,6 +55,13 @@ export default function CommentSection({ questionId }: { questionId: string }) {
           if (data) setComments(prev => [...prev, data as Comment])
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'comments', filter: `question_id=eq.${questionId}` },
+        (payload) => {
+          setComments(prev => prev.filter(c => c.id !== payload.old.id))
+        }
+      )
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
@@ -69,6 +79,10 @@ export default function CommentSection({ questionId }: { questionId: string }) {
   function cancelReply() {
     setReplyTo(null)
     setBody('')
+  }
+
+  async function deleteComment(id: string) {
+    await supabase.from('comments').delete().eq('id', id)
   }
 
   async function submit(e: React.FormEvent) {
@@ -108,6 +122,10 @@ export default function CommentSection({ questionId }: { questionId: string }) {
 
       {/* comments list */}
       <div className="space-y-2 max-h-96 overflow-y-auto">
+        {/* debug */}
+        {process.env.NODE_ENV === 'development' && user && (
+          <p className="text-xs text-blue-400">logged in as: {user.id}</p>
+        )}
         {topLevel.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-6">ยังไม่มีความคิดเห็น เป็นคนแรกได้เลย</p>
         ) : (
@@ -122,12 +140,22 @@ export default function CommentSection({ questionId }: { questionId: string }) {
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-400">{timeAgo(c.created_at)}</span>
                     {user && (
-                      <button
-                        onClick={() => handleReply(c)}
-                        className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
-                      >
-                        ตอบกลับ
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleReply(c)}
+                          className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
+                        >
+                          ตอบกลับ
+                        </button>
+                        {user.id === c.user_id && (
+                          <button
+                            onClick={() => deleteComment(c.id)}
+                            className="text-gray-300 hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -143,7 +171,17 @@ export default function CommentSection({ questionId }: { questionId: string }) {
                       <span className="text-xs font-semibold text-gray-600">
                         {r.users?.display_name ?? 'ไม่ระบุ'}
                       </span>
-                      <span className="text-xs text-gray-400">{timeAgo(r.created_at)}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400">{timeAgo(r.created_at)}</span>
+                        {user?.id === r.user_id && (
+                          <button
+                            onClick={() => deleteComment(r.id)}
+                            className="text-gray-300 hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <p className="text-sm text-gray-700 leading-relaxed">{r.body}</p>
                   </div>
