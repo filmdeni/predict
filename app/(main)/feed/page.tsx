@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import QuestionCard from '@/components/feed/QuestionCard'
-import CategoryFilter from '@/components/feed/CategoryFilter'
+import CategoryFilter, { PARENT_SUBS } from '@/components/feed/CategoryFilter'
 import TopPredictors from '@/components/feed/TopPredictors'
 import type { Database } from '@/lib/supabase/types'
 
@@ -73,12 +73,13 @@ export default function FeedPage() {
         .limit(50)
 
       if (category !== 'all') {
-        const { data: cat } = await supabase
+        const slugs = PARENT_SUBS[category] ?? [category]
+        const { data: cats } = await supabase
           .from('categories')
           .select('id')
-          .eq('slug', category)
-          .single()
-        if (cat && 'id' in cat) query = query.eq('category_id', (cat as { id: number }).id)
+          .in('slug', slugs)
+        const ids = (cats ?? []).map((c: { id: number }) => c.id)
+        query = query.in('category_id', ids.length > 0 ? ids : [-1])
       }
 
       const { data } = await query
@@ -163,7 +164,7 @@ export default function FeedPage() {
             )}
 
             {/* ยอดนิยมวันนี้ */}
-            {trending.length > 0 && (
+            {trending.length > 0 && category === 'all' && (
               <div className="space-y-3 border-t border-gray-100 pt-6">
                 <div className="flex items-center gap-2">
                   <span className="text-base">🔥</span>
@@ -187,7 +188,7 @@ export default function FeedPage() {
           </>
         )}
       </div>
-      <TopPredictors />
+      <TopPredictors category={category} />
     </div>
   )
 }
