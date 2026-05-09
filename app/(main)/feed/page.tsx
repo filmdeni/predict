@@ -126,19 +126,20 @@ export default function FeedPage() {
           <>
             {/* Active questions */}
             {active.length === 0 && resolved.length === 0 ? (
-              <div className="text-center text-gray-400 py-16">
+              <div className="text-center text-gray-400 py-16 animate-fadeInUp">
                 <p className="text-4xl mb-2">🔮</p>
                 <p>ยังไม่มีคำถามในหมวดนี้</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {active.map(q => (
-                  <QuestionCard
-                    key={q.id}
-                    question={q}
-                    isAdmin={isAdmin}
-                    onDelete={id => setQuestions(prev => prev.filter(x => x.id !== id))}
-                  />
+                {active.map((q, i) => (
+                  <div key={q.id} className="animate-fadeInUp" style={{ animationDelay: `${i * 40}ms` }}>
+                    <QuestionCard
+                      question={q}
+                      isAdmin={isAdmin}
+                      onDelete={id => setQuestions(prev => prev.filter(x => x.id !== id))}
+                    />
+                  </div>
                 ))}
               </div>
             )}
@@ -151,13 +152,14 @@ export default function FeedPage() {
                   <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{resolved.length}</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 opacity-70">
-                  {resolved.map(q => (
-                    <QuestionCard
-                      key={q.id}
-                      question={q}
-                      isAdmin={isAdmin}
-                      onDelete={id => setQuestions(prev => prev.filter(x => x.id !== id))}
-                    />
+                  {resolved.map((q, i) => (
+                    <div key={q.id} className="animate-fadeInUp" style={{ animationDelay: `${i * 40}ms` }}>
+                      <QuestionCard
+                        question={q}
+                        isAdmin={isAdmin}
+                        onDelete={id => setQuestions(prev => prev.filter(x => x.id !== id))}
+                      />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -174,13 +176,14 @@ export default function FeedPage() {
                   </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                  {trending.map(q => (
-                    <QuestionCard
-                      key={q.id}
-                      question={q}
-                      isAdmin={isAdmin}
-                      onDelete={id => setTrending(prev => prev.filter(x => x.id !== id))}
-                    />
+                  {trending.map((q, i) => (
+                    <div key={q.id} className="animate-fadeInUp" style={{ animationDelay: `${i * 40}ms` }}>
+                      <QuestionCard
+                        question={q}
+                        isAdmin={isAdmin}
+                        onDelete={id => setTrending(prev => prev.filter(x => x.id !== id))}
+                      />
+                    </div>
                   ))}
                 </div>
               </div>

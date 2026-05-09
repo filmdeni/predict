@@ -1,11 +1,20 @@
 export type RankTier = 'มือใหม่' | 'นักพยากรณ์' | 'โหรมือทอง' | 'เซียนฟันธง' | 'เทพทำนาย'
 
-export const RANKS = [
-  { tier: 'มือใหม่'     as RankTier, minRep: 0,    color: '#94a3b8', emoji: '🌱' },
-  { tier: 'นักพยากรณ์' as RankTier, minRep: 100,  color: '#60a5fa', emoji: '🔮' },
-  { tier: 'โหรมือทอง'  as RankTier, minRep: 500,  color: '#fbbf24', emoji: '⭐' },
-  { tier: 'เซียนฟันธง' as RankTier, minRep: 2000, color: '#f97316', emoji: '🏆' },
-  { tier: 'เทพทำนาย'   as RankTier, minRep: 5000, color: '#a855f7', emoji: '🌟' },
+export type RankDisplay = {
+  tier: RankTier
+  name: string     // แรงก์
+  title: string    // ฉายา
+  emoji: string
+  color: string
+  minRep: number
+}
+
+export const RANKS: RankDisplay[] = [
+  { tier: 'มือใหม่'     as RankTier, name: 'Seed',   title: 'เดาแต่โดน',       emoji: '🌱', color: '#94a3b8', minRep: 0    },
+  { tier: 'นักพยากรณ์' as RankTier, name: 'Pulse',  title: 'คนมีของ',          emoji: '⚡', color: '#60a5fa', minRep: 100  },
+  { tier: 'โหรมือทอง'  as RankTier, name: 'Signal', title: 'คนมันแม่น',        emoji: '🎯', color: '#fbbf24', minRep: 500  },
+  { tier: 'เซียนฟันธง' as RankTier, name: 'Oracle', title: 'ทรงนี้มาแน่',      emoji: '🔮', color: '#f97316', minRep: 2000 },
+  { tier: 'เทพทำนาย'   as RankTier, name: 'Zenith', title: 'ลูกรักจักรวาล',    emoji: '👑', color: '#a855f7', minRep: 5000 },
 ]
 
 export function getRank(reputation: number) {

@@ -58,8 +58,11 @@ export default function Header() {
   return (
     <>
     <header className="sticky top-0 z-40 bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
-      <Link href="/feed" className="text-xl font-bold text-gray-900 tracking-tight">
-        <span className="text-green-500">ภาว</span>นา
+      <Link href="/feed" className="flex flex-col leading-none">
+        <span className="text-xl font-bold text-gray-900 tracking-tight">
+          <span className="text-green-500">ภาว</span>นา
+        </span>
+        <span className="text-[10px] font-medium text-gray-400 tracking-wide mt-0.5">เกมทายกระแสสังคม</span>
       </Link>
       <div className="flex items-center gap-3">
         <button onClick={() => setShowSearch(true)} className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors">
