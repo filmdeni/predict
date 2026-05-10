@@ -4,15 +4,12 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
 import { Trophy, Flame } from 'lucide-react'
+import { RANKS } from '@/lib/game/ranks'
 
 type UserProfile = Database['public']['Tables']['users']['Row']
 
-const RANK_BADGE: Record<string, string> = {
-  'มือใหม่': '🌱',
-  'นักพยากรณ์': '🔮',
-  'โหรมือทอง': '🥇',
-  'เซียนฟันธง': '⚡',
-  'เทพทำนาย': '👑',
+function getRankDisplay(tier: string) {
+  return RANKS.find(r => r.tier === tier) ?? RANKS[0]
 }
 
 const MEDAL = ['🥇', '🥈', '🥉']
@@ -74,9 +71,7 @@ export default function LeaderboardPage() {
       ) : (
         <div className="space-y-2">
           {users.map((u, i) => {
-            const value = tab === 'reputation' ? `${u.coins.toLocaleString()} P`
-              : tab === 'winrate' ? `${u.correct_predictions}/${u.total_predictions} ถูก`
-              : `${u.win_streak} streak`
+            const coinsValue = u.coins.toLocaleString()
 
             return (
               <div
@@ -93,10 +88,30 @@ export default function LeaderboardPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-900 truncate">{u.display_name}</p>
-                  <p className="text-xs text-gray-400">{RANK_BADGE[u.rank]} {u.rank}</p>
+                  {(() => {
+                    const rd = getRankDisplay(u.rank)
+                    return (
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-xs font-bold" style={{ color: rd.color }}>
+                          {rd.emoji} {rd.name}
+                        </span>
+                        <span className="text-gray-300 text-xs">·</span>
+                        <span className="text-[11px] text-gray-400">"{rd.title}"</span>
+                      </div>
+                    )
+                  })()}
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-gray-900">{value}</p>
+                  {tab === 'reputation' ? (
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <span className="text-sm font-bold text-gray-900">{coinsValue}</span>
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[10px] leading-none flex-shrink-0">P</span>
+                    </div>
+                  ) : tab === 'winrate' ? (
+                    <p className="text-sm font-bold text-gray-900">{u.correct_predictions}/{u.total_predictions} ถูก</p>
+                  ) : (
+                    <p className="text-sm font-bold text-gray-900">{u.win_streak} streak</p>
+                  )}
                   {u.win_streak > 2 && tab !== 'streak' && (
                     <p className="text-xs text-orange-400 flex items-center justify-end gap-0.5">
                       <Flame size={10} />{u.win_streak}

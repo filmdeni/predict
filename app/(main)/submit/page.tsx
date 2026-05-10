@@ -36,7 +36,8 @@ export default function SubmitQuestionPage() {
 
       const d = new Date()
       d.setDate(d.getDate() + 7)
-      setClosesAt(d.toISOString().slice(0, 16))
+      const pad = (n: number) => String(n).padStart(2, '0')
+      setClosesAt(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`)
     }
     init()
   }, [])

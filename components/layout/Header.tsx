@@ -19,15 +19,19 @@ export default function Header() {
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null
 
+    let userId: string | null = null
+
+    async function fetchCoins() {
+      if (!userId) return
+      const { data: profile } = await supabase.from('users').select('coins').eq('id', userId).single()
+      if (profile) setCoins((profile as { coins: number }).coins)
+    }
+
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return
       setUser(data.user)
-      const { data: profile } = await supabase
-        .from('users')
-        .select('coins')
-        .eq('id', data.user.id)
-        .single()
-      if (profile) setCoins((profile as { coins: number }).coins)
+      userId = data.user.id
+      await fetchCoins()
 
       channel = supabase
         .channel(`header-coins:${data.user.id}:${Date.now()}`)
@@ -39,6 +43,8 @@ export default function Header() {
         .subscribe()
     })
 
+    window.addEventListener('coins-updated', fetchCoins)
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setUser(session?.user ?? null)
       if (!session?.user) setCoins(null)
@@ -47,6 +53,7 @@ export default function Header() {
     return () => {
       subscription.unsubscribe()
       if (channel) supabase.removeChannel(channel)
+      window.removeEventListener('coins-updated', fetchCoins)
     }
   }, [])
 

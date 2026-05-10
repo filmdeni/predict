@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
-import { LogOut, Trophy, Target, Flame, Coins, BookOpen } from 'lucide-react'
+import { LogOut, Trophy, Target, Flame, Coins, BookOpen, Star } from 'lucide-react'
+import { RANKS, getRank, getNextRank, getProgressToNext } from '@/lib/game/ranks'
 
 type UserProfile = Database['public']['Tables']['users']['Row']
 type Prediction = Database['public']['Tables']['predictions']['Row'] & {
@@ -84,11 +85,21 @@ export default function ProfilePage() {
     )
   }
 
-  if (!profile) return null
+  if (!profile) return (
+    <div className="max-w-lg mx-auto p-6 flex flex-col items-center gap-4 pt-20 text-center">
+      <p className="text-gray-400 text-sm">ไม่พบข้อมูลโปรไฟล์</p>
+      <button onClick={signOut} className="text-sm text-red-500 underline">ออกจากระบบ</button>
+    </div>
+  )
 
   const winRate = profile.total_predictions > 0
     ? Math.round((profile.correct_predictions / profile.total_predictions) * 100)
     : 0
+
+  const rep = Number(profile.reputation ?? 0)
+  const rankDisplay = getRank(rep)
+  const nextRank = getNextRank(rep)
+  const progress = getProgressToNext(rep)
 
   return (
     <div className="max-w-lg mx-auto p-6 space-y-5">
@@ -117,6 +128,31 @@ export default function ProfilePage() {
             <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-xs leading-none">P</span>
             {profile.coins.toLocaleString()}
           </span>
+        </div>
+
+        {/* Rank progress */}
+        <div className="mt-3 bg-gray-50 rounded-xl px-4 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <span className="text-base">{rankDisplay.emoji}</span>
+              <span className="text-sm font-bold" style={{ color: rankDisplay.color }}>{rankDisplay.name}</span>
+              <span className="text-xs text-gray-400">"{rankDisplay.title}"</span>
+            </div>
+            <span className="text-xs text-gray-400">{rep.toLocaleString()} rep</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-1.5">
+            <div
+              className="h-1.5 rounded-full transition-all duration-500"
+              style={{ width: `${progress}%`, backgroundColor: rankDisplay.color }}
+            />
+          </div>
+          {nextRank ? (
+            <p className="text-[11px] text-gray-400 text-right">
+              อีก {(nextRank.minRep - rep).toLocaleString()} rep → {nextRank.emoji} {nextRank.name}
+            </p>
+          ) : (
+            <p className="text-[11px] text-gray-400 text-right">แรงก์สูงสุดแล้ว 🌌</p>
+          )}
         </div>
 
         {/* Stats */}

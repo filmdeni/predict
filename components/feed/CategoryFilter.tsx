@@ -3,7 +3,7 @@
 import { useState } from 'react'
 
 export const PARENT_SUBS: Record<string, string[]> = {
-  esports: ['esports', 'dota2', 'apex', 'cs2'],
+  esports: ['esports', 'dota2', 'apex', 'cs2', 'rov'],
   sports:  ['sports', 'football', 'boxing', 'nba'],
 }
 
@@ -21,6 +21,7 @@ const GROUPS = [
       { slug: 'dota2', name: 'Dota 2', icon: '🔴' },
       { slug: 'apex',  name: 'Apex',   icon: '🎯' },
       { slug: 'cs2',   name: 'CS2',    icon: '🔫' },
+      { slug: 'rov',   name: 'ROV',    icon: '⚔️' },
     ],
   },
   {

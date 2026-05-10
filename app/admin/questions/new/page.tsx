@@ -35,10 +35,11 @@ export default function NewQuestionPage() {
       setCategories(cats)
       if (cats[0]) setCategoryId(cats[0].id)
 
-      // default closes_at = 7 วันข้างหน้า
+      // default closes_at = 7 วันข้างหน้า (local time สำหรับ datetime-local input)
       const d = new Date()
       d.setDate(d.getDate() + 7)
-      setClosesAt(d.toISOString().slice(0, 16))
+      const pad = (n: number) => String(n).padStart(2, '0')
+      setClosesAt(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`)
     }
     init()
   }, [])

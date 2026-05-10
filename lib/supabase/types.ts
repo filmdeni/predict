@@ -1,6 +1,6 @@
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[]
 
-export type RankTier = 'มือใหม่' | 'นักพยากรณ์' | 'โหรมือทอง' | 'เซียนฟันธง' | 'เทพทำนาย'
+export type RankTier = 'ผู้มาใหม่' | 'ผู้ตื่นรู้' | 'นักพยากรณ์' | 'โหรมือทอง' | 'เซียนทำนาย' | 'เทพทำนาย' | 'จักรวาลเลือก'
 export type QuestionStatus = 'pending' | 'open' | 'closed' | 'resolved' | 'cancelled'
 
 export interface QuestionOption {

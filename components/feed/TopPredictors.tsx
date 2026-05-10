@@ -246,10 +246,10 @@ export default function TopPredictors({ category }: { category: string }) {
 
               <div className="text-right">
                 {tab === 'coins' ? (
-                  <>
-                    <p className="text-sm font-bold text-gray-900">{coins.toLocaleString()}</p>
-                    <p className="text-[11px] text-gray-400">P</p>
-                  </>
+                  <div className="flex items-center gap-1.5 justify-end">
+                    <span className="text-sm font-bold text-gray-900">{coins.toLocaleString()}</span>
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[10px] leading-none flex-shrink-0">P</span>
+                  </div>
                 ) : (
                   <>
                     <p className="text-sm font-bold text-gray-900">{correct}</p>

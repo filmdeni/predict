@@ -109,7 +109,7 @@ function LoginForm() {
                 <div className="flex-1 h-px bg-gradient-to-r from-white/10 to-transparent" />
                 <div className="inline-flex items-center gap-2 border border-amber-400/20 rounded-full px-3.5 py-1.5 bg-amber-400/[0.04]">
                   <span className="text-[11px] text-amber-300/70 tracking-wide font-light">
-                    🎁 สมัครวันนี้ รับ 3,000 P สำหรับเริ่มต้นทันที
+                    🔮 เริ่มทำนายฟรี รับ 500 คะแนน + โบนัสรายวัน
                   </span>
                 </div>
                 <div className="flex-1 h-px bg-gradient-to-l from-white/10 to-transparent" />
