@@ -24,6 +24,13 @@ function timeLeft(closesAt: string): string {
   return `${mins} นาที`
 }
 
+function urgencyLevel(closesAt: string): 'normal' | 'soon' | 'critical' {
+  const diff = new Date(closesAt).getTime() - Date.now()
+  if (diff <= 1800000) return 'critical'   // < 30 min
+  if (diff <= 7200000) return 'soon'        // < 2 hr
+  return 'normal'
+}
+
 export default function QuestionPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
@@ -34,6 +41,7 @@ export default function QuestionPage() {
   const [showModal, setShowModal] = useState(false)
   const [success, setSuccess] = useState(false)
   const [user, setUser] = useState<import('@supabase/supabase-js').User | null>(null)
+  const [trendingOption, setTrendingOption] = useState<{ id: string; label: string; delta: number } | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -66,7 +74,19 @@ export default function QuestionPage() {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'questions', filter: `id=eq.${id}` },
         (payload) => {
-          setQuestion(prev => prev ? { ...prev, ...payload.new } : prev)
+          setQuestion(prev => {
+            if (!prev) return prev
+            const oldShares = getPoolShares(prev.pool)
+            const newShares = getPoolShares(payload.new.pool as Record<string, number>)
+            const opts = prev.options as { id: string; label: string }[]
+            let best: { id: string; label: string; delta: number } | null = null
+            for (const opt of opts) {
+              const delta = (newShares[opt.id] ?? 0) - (oldShares[opt.id] ?? 0)
+              if (delta > 0 && (!best || delta > best.delta)) best = { ...opt, delta }
+            }
+            if (best) setTrendingOption(best)
+            return { ...prev, ...payload.new }
+          })
         }
       )
       .subscribe()
@@ -184,7 +204,7 @@ export default function QuestionPage() {
             })}
             <span className="text-xs text-gray-400 ml-auto flex items-center gap-1">
                 <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[9px] leading-none flex-shrink-0">P</span>
-                {question.total_pool.toLocaleString()} คะแนน
+                คะแนนรวม {question.total_pool.toLocaleString()}
               </span>
           </div>
         </div>
@@ -193,7 +213,7 @@ export default function QuestionPage() {
           <span>👥 {question.predictions_count} คนทาย</span>
           <span className="flex items-center gap-1">
             <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[9px] leading-none flex-shrink-0">P</span>
-            {question.total_pool.toLocaleString()} คะแนน
+            คะแนนรวม {question.total_pool.toLocaleString()}
           </span>
         </div>
       </div>
@@ -222,6 +242,37 @@ export default function QuestionPage() {
               </button>
             )
           })}
+        </div>
+      )}
+
+      {/* FOMO strip */}
+      {isOpen && (
+        <div className="flex flex-wrap gap-2">
+          {trendingOption && (
+            <span className="flex items-center gap-1 text-xs bg-orange-50 text-orange-700 border border-orange-200 rounded-full px-2.5 py-1 font-medium">
+              🔥 คนกำลังเทไปฝั่ง &ldquo;{trendingOption.label}&rdquo;
+              {trendingOption.delta >= 1 && <span className="text-orange-500">+{trendingOption.delta.toFixed(0)}%</span>}
+            </span>
+          )}
+          {(() => {
+            const level = urgencyLevel(question.closes_at)
+            if (level === 'critical') return (
+              <span className="flex items-center gap-1 text-xs bg-red-50 text-red-600 border border-red-200 rounded-full px-2.5 py-1 font-medium animate-pulse">
+                ⏰ ปิดตลาดใน {timeLeft(question.closes_at)}!
+              </span>
+            )
+            if (level === 'soon') return (
+              <span className="flex items-center gap-1 text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-1 font-medium">
+                ⏰ ปิดตลาดใน {timeLeft(question.closes_at)}
+              </span>
+            )
+            return null
+          })()}
+          {question.predictions_count >= 5 && (
+            <span className="flex items-center gap-1 text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded-full px-2.5 py-1 font-medium">
+              👥 {question.predictions_count} คนทายแล้ว
+            </span>
+          )}
         </div>
       )}
 

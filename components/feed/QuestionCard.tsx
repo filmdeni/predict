@@ -62,14 +62,23 @@ function ArcGauge({ pct }: { pct: number }) {
   )
 }
 
+function urgencyLevel(closesAt: string): 'normal' | 'soon' | 'critical' {
+  const diff = new Date(closesAt).getTime() - Date.now()
+  if (diff <= 1800000) return 'critical'
+  if (diff <= 7200000) return 'soon'
+  return 'normal'
+}
+
 interface Props {
   question: Question
   initialSaved?: boolean
   isAdmin?: boolean
+  isHot?: boolean
+  recentCount?: number
   onDelete?: (id: string) => void
 }
 
-export default function QuestionCard({ question, initialSaved = false, isAdmin = false, onDelete }: Props) {
+export default function QuestionCard({ question, initialSaved = false, isAdmin = false, isHot = false, recentCount, onDelete }: Props) {
   const shares = getPoolShares(question.pool)
   const options = question.options as { id: string; label: string }[]
   const isBinary = options.length === 2
@@ -120,9 +129,24 @@ export default function QuestionCard({ question, initialSaved = false, isAdmin =
     })
   }
 
+  const urgency = question.status === 'open' ? urgencyLevel(question.closes_at) : 'normal'
+  const borderClass = isHot
+    ? 'border-orange-200 shadow-orange-50'
+    : urgency === 'critical'
+    ? 'border-red-200'
+    : urgency === 'soon'
+    ? 'border-amber-200'
+    : 'border-gray-200'
+
   return (
     <Link href={`/question/${question.id}`}>
-      <article className="relative bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer h-full flex flex-col gap-3">
+      <article className={`relative bg-white border rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer h-full flex flex-col gap-3 ${borderClass}`}>
+        {/* HOT badge */}
+        {isHot && !isAdmin && (
+          <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+            🔥 HOT
+          </div>
+        )}
         {/* admin delete */}
         {isAdmin && (
           <div className="absolute top-2 right-2 z-10 flex items-center gap-1" onClick={e => e.preventDefault()}>
@@ -179,43 +203,56 @@ export default function QuestionCard({ question, initialSaved = false, isAdmin =
             </div>
           ) : (
             <div className="space-y-1.5">
-              {options.map(opt => (
-                <div key={opt.id} className="flex items-center justify-between">
-                  <span className="text-xs text-gray-600 truncate flex-1 mr-2">{opt.label}</span>
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <span className="text-xs font-bold text-gray-900">{(shares[opt.id] ?? 0).toFixed(0)}%</span>
-                    <button className="px-2 py-0.5 bg-green-50 border border-green-200 text-green-700 text-[11px] font-medium rounded hover:bg-green-100 transition-colors">
-                      ใช่
-                    </button>
-                    <button className="px-2 py-0.5 bg-red-50 border border-red-200 text-red-600 text-[11px] font-medium rounded hover:bg-red-100 transition-colors">
-                      ไม่
-                    </button>
+              {options.slice(0, 4).map((opt, i) => {
+                const colors = ['bg-green-400', 'bg-blue-400', 'bg-orange-400', 'bg-purple-400']
+                const pct = shares[opt.id] ?? 0
+                return (
+                  <div key={opt.id} className="space-y-0.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-600 truncate flex-1 mr-2">{opt.label}</span>
+                      <span className="text-xs font-bold text-gray-900 flex-shrink-0">{pct.toFixed(0)}%</span>
+                    </div>
+                    <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                      <div className={`h-full ${colors[i % colors.length]} rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
 
         {/* bottom */}
-        <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-          <div className="flex items-center gap-2 text-xs text-gray-400">
+        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+          <div className="flex items-center gap-2 text-xs text-gray-400 min-w-0">
             {question.status === 'open' && (
-              <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                {timeLeft(question.closes_at)}
+              urgency === 'critical' ? (
+                <span className="flex items-center gap-1 text-red-500 font-semibold animate-pulse flex-shrink-0">
+                  ⏰ {timeLeft(question.closes_at)}
+                </span>
+              ) : urgency === 'soon' ? (
+                <span className="flex items-center gap-1 text-amber-600 font-medium flex-shrink-0">
+                  ⏰ {timeLeft(question.closes_at)}
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 flex-shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                  {timeLeft(question.closes_at)}
+                </span>
+              )
+            )}
+            {isHot && recentCount ? (
+              <span className="text-orange-500 font-medium flex-shrink-0">🔥 {recentCount} ทายใน 24ชม.</span>
+            ) : (
+              <span className="flex items-center gap-1 truncate">
+                <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[8px] leading-none flex-shrink-0">P</span>
+                <span className="truncate">{formatPool(question.total_pool)} · 👥 {question.predictions_count}</span>
               </span>
             )}
-            <span className="flex items-center gap-1">
-                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[9px] leading-none flex-shrink-0">P</span>
-                <span>{formatPool(question.total_pool)} คะแนน</span>
-                <span className="text-gray-300">·</span>
-                <span>👥 {question.predictions_count} คนทาย</span>
-              </span>
           </div>
-          <div className="flex items-center gap-2 text-gray-300">
+          <div className="flex items-center gap-1.5 text-gray-300 flex-shrink-0 ml-2">
             <button className="hover:text-gray-500 transition-colors" onClick={e => e.preventDefault()}>
-              <Gift size={14} />
+              <Gift size={13} />
             </button>
             <button
               onClick={toggleSave}
@@ -223,7 +260,7 @@ export default function QuestionCard({ question, initialSaved = false, isAdmin =
               className={`transition-colors ${saved ? 'text-indigo-500 hover:text-indigo-700' : 'hover:text-gray-500'}`}
               aria-label={saved ? 'ลบออกจากรายการโปรด' : 'เพิ่มในรายการโปรด'}
             >
-              <Bookmark size={14} fill={saved ? 'currentColor' : 'none'} />
+              <Bookmark size={13} fill={saved ? 'currentColor' : 'none'} />
             </button>
           </div>
         </div>

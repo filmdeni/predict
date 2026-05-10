@@ -6,11 +6,10 @@ import { createClient } from '@/lib/supabase/client'
 import { Plus, Trash2, CheckCircle2, Clock, Users, ThumbsUp, ThumbsDown } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
 
+
 type Question = Database['public']['Tables']['questions']['Row'] & {
   categories: { name_th: string; emoji: string }
 }
-
-const ADMIN_EMAIL = 'zwwzww19192@gmail.com'
 
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   pending:  { label: 'รออนุมัติ',  color: 'bg-blue-100 text-blue-700' },
@@ -32,14 +31,7 @@ export default function AdminQuestionsPage() {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || user.email !== ADMIN_EMAIL) { router.replace('/feed'); return }
-      load()
-    }
-    init()
-  }, [])
+  useEffect(() => { load() }, [])
 
   async function load() {
     setLoading(true)

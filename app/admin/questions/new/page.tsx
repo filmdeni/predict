@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Trash2 } from 'lucide-react'
 
-const ADMIN_EMAIL = 'zwwzww19192@gmail.com'
-
 interface Option { id: string; label: string }
 
 export default function NewQuestionPage() {
@@ -27,9 +25,6 @@ export default function NewQuestionPage() {
 
   useEffect(() => {
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || user.email !== ADMIN_EMAIL) { router.replace('/feed'); return }
-
       const { data } = await supabase.from('categories').select('id, name_th, emoji').order('sort_order')
       const cats = (data ?? []) as { id: number; name_th: string; emoji: string }[]
       setCategories(cats)

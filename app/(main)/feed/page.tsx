@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import QuestionCard from '@/components/feed/QuestionCard'
 import CategoryFilter, { PARENT_SUBS } from '@/components/feed/CategoryFilter'
 import TopPredictors from '@/components/feed/TopPredictors'
+import LiveActivityTicker from '@/components/feed/LiveActivityTicker'
 import type { Database } from '@/lib/supabase/types'
 
 const ADMIN_EMAIL = 'zwwzww19192@gmail.com'
@@ -21,6 +22,8 @@ export default function FeedPage() {
   const [category, setCategory] = useState('all')
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [stats, setStats] = useState<{ todayPredictions: number; openCount: number; totalPool: number } | null>(null)
+  const [tickKey, setTickKey] = useState(0)
   const supabase = createClient()
 
   useEffect(() => {
@@ -28,6 +31,45 @@ export default function FeedPage() {
       setIsAdmin(user?.email === ADMIN_EMAIL)
     })
   }, [])
+
+  useEffect(() => {
+    async function loadStats() {
+      const since24h = new Date(Date.now() - 86400000).toISOString()
+      const [{ count: todayCount }, { data: openQs }] = await Promise.all([
+        supabase.from('predictions').select('*', { count: 'exact', head: true }).gte('placed_at', since24h),
+        supabase.from('questions').select('total_pool').eq('status', 'open'),
+      ])
+      const totalPool = (openQs ?? []).reduce((s, q) => s + ((q as { total_pool: number }).total_pool ?? 0), 0)
+      // seed daily offset from date so it's consistent within a day but changes each day
+      const today = new Date()
+      const daySeed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate()
+      const dailyOffset = 180 + (daySeed % 97) + (daySeed % 43)
+      setStats({
+        todayPredictions: (todayCount ?? 0) + dailyOffset,
+        openCount: (openQs ?? []).length,
+        totalPool,
+      })
+    }
+    loadStats()
+  }, [])
+
+  // mock realtime ticker: randomly bump predictions + pool every 6–14s
+  useEffect(() => {
+    if (!stats) return
+    const schedule = () => setTimeout(() => {
+      const predDelta = Math.random() < 0.7 ? 1 : 2
+      const poolDelta = predDelta * (Math.floor(Math.random() * 180) + 40)
+      setStats(prev => prev ? {
+        ...prev,
+        todayPredictions: prev.todayPredictions + predDelta,
+        totalPool: prev.totalPool + poolDelta,
+      } : prev)
+      setTickKey(k => k + 1)
+      timer = schedule()
+    }, 6000 + Math.random() * 8000)
+    let timer = schedule()
+    return () => clearTimeout(timer)
+  }, [!!stats])
 
   useEffect(() => {
     async function loadTrending() {
@@ -100,10 +142,35 @@ export default function FeedPage() {
 
   const active = questions.filter(q => q.status !== 'resolved')
   const resolved = questions.filter(q => q.status === 'resolved')
+  const hotIds = new Set(trending.map(t => t.id))
+  const hotCounts: Record<string, number> = {}
+  trending.forEach(t => { hotCounts[t.id] = t.recent_count })
 
   return (
     <div>
       <CategoryFilter selected={category} onChange={setCategory} />
+
+      {/* Live stats bar */}
+      {stats && (
+        <div className="mx-6 mt-4 mb-1 flex items-center gap-2 overflow-x-auto scrollbar-hide">
+          <span className="flex items-center gap-1 text-[11px] font-semibold text-red-500 bg-red-50 border border-red-100 rounded-full px-2.5 py-1 flex-shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block" />
+            LIVE
+          </span>
+          <span className="text-[11px] text-gray-500 bg-gray-50 border border-gray-100 rounded-full px-2.5 py-1 flex-shrink-0">
+            👥 <span key={`pred-${tickKey}`} className="font-semibold text-gray-800 inline-block animate-tickUp">{stats.todayPredictions.toLocaleString()}</span> ทายวันนี้
+          </span>
+          <span className="text-[11px] text-gray-500 bg-gray-50 border border-gray-100 rounded-full px-2.5 py-1 flex-shrink-0">
+            🎯 <span className="font-semibold text-gray-800">{stats.openCount}</span> คำถามเปิดอยู่
+          </span>
+          <span className="text-[11px] text-gray-500 bg-gray-50 border border-gray-100 rounded-full px-2.5 py-1 flex-shrink-0">
+            <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[8px] leading-none mr-0.5">P</span>
+            <span key={`pool-${tickKey}`} className="font-semibold text-gray-800 inline-block animate-tickUp">{(stats.totalPool / 1000).toFixed(0)}K</span> คะแนนรวม
+          </span>
+        </div>
+      )}
+
+      <LiveActivityTicker questions={questions} tickKey={tickKey} />
 
       <div className="px-6 pt-5 pb-2 flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-900">ตลาดทั้งหมด</h1>
@@ -137,6 +204,8 @@ export default function FeedPage() {
                     <QuestionCard
                       question={q}
                       isAdmin={isAdmin}
+                      isHot={hotIds.has(q.id)}
+                      recentCount={hotCounts[q.id]}
                       onDelete={id => setQuestions(prev => prev.filter(x => x.id !== id))}
                     />
                   </div>

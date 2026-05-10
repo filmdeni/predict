@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { RANKS } from '@/lib/game/ranks'
 import { Info, X } from 'lucide-react'
+import RankAvatar from '@/components/ui/RankAvatar'
 
 type TopUser = {
   id: string
@@ -150,7 +151,7 @@ export default function TopPredictors({ category }: { category: string }) {
 
             <div className="space-y-1.5">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">การทาย</p>
-              <p className="text-sm text-gray-700">วางคะแนนเพื่อทาย — ทายถูกได้รับสัดส่วนจาก pool รวม (parimutuel)</p>
+              <p className="text-sm text-gray-700">วางคะแนนเพื่อทาย — ทายถูกได้รับสัดส่วนจากคะแนนรวม (parimutuel)</p>
             </div>
 
             <div className="space-y-2">
@@ -217,17 +218,12 @@ export default function TopPredictors({ category }: { category: string }) {
             <div key={id} className="flex items-center gap-3 px-4 py-3">
               <span className="w-6 text-center text-base">{MEDAL[i] ?? `${i + 1}`}</span>
 
-              {user.avatar_url ? (
-                <img
-                  src={user.avatar_url}
-                  alt={user.display_name}
-                  className="w-9 h-9 rounded-full object-cover border border-gray-100"
-                />
-              ) : (
-                <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold text-gray-500">
-                  {user.display_name[0]}
-                </div>
-              )}
+              <RankAvatar
+                avatarUrl={user.avatar_url}
+                displayName={user.display_name}
+                rank={user.rank}
+                size="sm"
+              />
 
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-900 truncate">{user.display_name}</p>
