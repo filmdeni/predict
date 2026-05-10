@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { estimatePayout } from '@/lib/game/odds'
+import { getRank } from '@/lib/game/ranks'
 import type { Database } from '@/lib/supabase/types'
 import { X } from 'lucide-react'
 
@@ -15,11 +16,36 @@ interface Props {
   onSuccess: () => void
 }
 
+const WAGER_CAPS: Record<string, number> = {
+  'ผู้มาใหม่':      50,
+  'ผู้ตื่นรู้':    100,
+  'นักพยากรณ์':   200,
+  'โหรมือทอง':    300,
+  'เซียนทำนาย':   500,
+  'เทพทำนาย':     700,
+  'จักรวาลเลือก': 1000,
+}
+
 export default function PlacePredictionModal({ question, optionId, onClose, onSuccess }: Props) {
   const [coins, setCoins] = useState(10)
+  const [maxWager, setMaxWager] = useState(100)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const supabase = createClient()
+
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data } = await supabase
+        .from('users')
+        .select('reputation')
+        .eq('id', user.id)
+        .single()
+      if (!data) return
+      const rank = getRank((data as { reputation: number }).reputation)
+      setMaxWager(WAGER_CAPS[rank.tier] ?? 100)
+    })
+  }, [])
 
   const option = question.options.find(o => o.id === optionId)
   const payout = estimatePayout(question.pool, optionId, coins)
@@ -109,27 +135,31 @@ export default function PlacePredictionModal({ question, optionId, onClose, onSu
           <input
             type="range"
             min={1}
-            max={100}
+            max={maxWager}
             step={1}
-            value={coins}
+            value={Math.min(coins, maxWager)}
             onChange={e => setCoins(Number(e.target.value))}
             className="w-full accent-gray-900"
           />
           <div className="flex justify-between gap-2">
-            {[5, 10, 50, 100].map(v => (
-              <button
-                key={v}
-                onClick={() => setCoins(v)}
-                className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                  coins === v
-                    ? 'bg-gray-900 border-gray-900 text-white'
-                    : 'bg-white border-gray-200 text-gray-500 hover:border-gray-400'
-                }`}
-              >
-                {v}
-              </button>
-            ))}
+            {[10, 25, 50, 100].map(v => {
+              const val = Math.round(maxWager * v / 100)
+              return (
+                <button
+                  key={v}
+                  onClick={() => setCoins(val)}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                    coins === val
+                      ? 'bg-gray-900 border-gray-900 text-white'
+                      : 'bg-white border-gray-200 text-gray-500 hover:border-gray-400'
+                  }`}
+                >
+                  {v}%
+                </button>
+              )
+            })}
           </div>
+          <p className="text-[11px] text-gray-400 text-right">สูงสุด {maxWager.toLocaleString()} P ตามแรงก์ของคุณ</p>
         </div>
 
         {/* payout estimate */}
