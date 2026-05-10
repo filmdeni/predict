@@ -13,11 +13,13 @@ type Prediction = Database['public']['Tables']['predictions']['Row'] & {
 }
 
 const RANK_COLOR: Record<string, string> = {
-  'มือใหม่': 'text-gray-400 bg-gray-100',
-  'นักพยากรณ์': 'text-blue-600 bg-blue-50',
-  'โหรมือทอง': 'text-yellow-600 bg-yellow-50',
-  'เซียนฟันธง': 'text-purple-600 bg-purple-50',
-  'เทพทำนาย': 'text-red-600 bg-red-50',
+  'ผู้มาใหม่':     'text-slate-500 bg-slate-100',
+  'ผู้ตื่นรู้':    'text-blue-500 bg-blue-50',
+  'นักพยากรณ์':   'text-emerald-600 bg-emerald-50',
+  'โหรมือทอง':    'text-yellow-600 bg-yellow-50',
+  'เซียนทำนาย':   'text-orange-500 bg-orange-50',
+  'เทพทำนาย':     'text-purple-600 bg-purple-50',
+  'จักรวาลเลือก': 'text-pink-600 bg-pink-50',
 }
 
 export default function ProfilePage() {
@@ -33,6 +35,14 @@ export default function ProfilePage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
+
+      // ensure profile row exists (trigger may have failed on first login)
+      await (supabase.from('users') as any).upsert({
+        id: user.id,
+        username: (user.email?.split('@')[0] ?? 'user') + '_' + user.id.slice(0, 4),
+        display_name: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'ผู้ใช้',
+        avatar_url: user.user_metadata?.avatar_url ?? null,
+      }, { onConflict: 'id', ignoreDuplicates: true })
 
       const [{ data: prof }, { data: preds }] = await Promise.all([
         supabase.from('users').select('*').eq('id', user.id).single(),
