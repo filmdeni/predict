@@ -8,12 +8,18 @@ import type { Database } from '@/lib/supabase/types'
 import { Target, Trophy, Flame, ArrowLeft } from 'lucide-react'
 
 type UserProfile = Database['public']['Tables']['users']['Row']
+type BadgeRow = {
+  badge_id: string
+  earned_at: string
+  badges: { id: string; name_th: string; description_th: string | null; emoji: string; category: string }
+}
 
 export default function PublicProfilePage() {
   const { username } = useParams<{ username: string }>()
   const router = useRouter()
   const supabase = createClient()
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [badges, setBadges] = useState<BadgeRow[]>([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
 
@@ -23,9 +29,15 @@ export default function PublicProfilePage() {
       .select('*')
       .eq('username', username)
       .single()
-      .then(({ data }) => {
-        if (!data) setNotFound(true)
-        else setProfile(data as unknown as UserProfile)
+      .then(async ({ data }) => {
+        if (!data) { setNotFound(true); setLoading(false); return }
+        setProfile(data as unknown as UserProfile)
+        const { data: userBadges } = await (supabase as any)
+          .from('user_badges')
+          .select('badge_id, earned_at, badges(id, name_th, description_th, emoji, category)')
+          .eq('user_id', (data as unknown as UserProfile).id)
+          .order('earned_at', { ascending: false })
+        setBadges((userBadges ?? []) as BadgeRow[])
         setLoading(false)
       })
   }, [username])
@@ -133,6 +145,24 @@ export default function PublicProfilePage() {
           <div>
             <p className="text-sm font-bold text-gray-900">Best Streak</p>
             <p className="text-xs text-gray-400">ทายถูกติดต่อกันสูงสุด {profile.best_streak} ครั้ง</p>
+          </div>
+        </div>
+      )}
+
+      {/* Badges */}
+      {badges.length > 0 && (
+        <div>
+          <h2 className="text-sm font-semibold text-gray-500 mb-3">ป้ายเกียรติยศ</h2>
+          <div className="grid grid-cols-2 gap-3">
+            {badges.map(row => (
+              <div key={row.badge_id} className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col items-center text-center gap-2">
+                <span className="text-3xl">{row.badges.emoji}</span>
+                <p className="text-sm font-bold text-gray-900">{row.badges.name_th}</p>
+                {row.badges.description_th && (
+                  <p className="text-[11px] text-gray-400 leading-snug">{row.badges.description_th}</p>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}

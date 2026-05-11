@@ -23,13 +23,29 @@ export default function LeaderboardPage() {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const orderCol = tab === 'reputation' ? 'coins' : tab === 'winrate' ? 'correct_predictions' : 'win_streak'
-      const { data } = await supabase
-        .from('users')
-        .select('*')
-        .order(orderCol, { ascending: false })
-        .limit(20)
-      setUsers(data ?? [])
+      if (tab === 'winrate') {
+        // sort client-side by true win rate (min 5 predictions)
+        const { data } = await supabase
+          .from('users')
+          .select('*')
+          .gte('total_predictions', 5)
+          .order('correct_predictions', { ascending: false })
+          .limit(200)
+        const sorted = ((data ?? []) as UserProfile[]).sort((a, b) => {
+          const ra = a.total_predictions > 0 ? a.correct_predictions / a.total_predictions : 0
+          const rb = b.total_predictions > 0 ? b.correct_predictions / b.total_predictions : 0
+          return rb - ra
+        }).slice(0, 20)
+        setUsers(sorted)
+      } else {
+        const orderCol = tab === 'reputation' ? 'reputation' : 'win_streak'
+        const { data } = await supabase
+          .from('users')
+          .select('*')
+          .order(orderCol, { ascending: false })
+          .limit(20)
+        setUsers(data ?? [])
+      }
       setLoading(false)
     }
     load()
@@ -104,11 +120,16 @@ export default function LeaderboardPage() {
                 <div className="text-right">
                   {tab === 'reputation' ? (
                     <div className="flex items-center gap-1.5 justify-end">
-                      <span className="text-sm font-bold text-gray-900">{coinsValue}</span>
-                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[10px] leading-none flex-shrink-0">P</span>
+                      <span className="text-sm font-bold text-gray-900">{Number(u.reputation ?? 0).toLocaleString()}</span>
+                      <span className="text-xs text-gray-400">rep</span>
                     </div>
                   ) : tab === 'winrate' ? (
-                    <p className="text-sm font-bold text-gray-900">{u.correct_predictions}/{u.total_predictions} ถูก</p>
+                    <div>
+                      <p className="text-sm font-bold text-gray-900">
+                        {u.total_predictions > 0 ? Math.round(u.correct_predictions / u.total_predictions * 100) : 0}%
+                      </p>
+                      <p className="text-[11px] text-gray-400">{u.correct_predictions}/{u.total_predictions}</p>
+                    </div>
                   ) : (
                     <p className="text-sm font-bold text-gray-900">{u.win_streak} streak</p>
                   )}

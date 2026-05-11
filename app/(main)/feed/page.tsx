@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import QuestionCard from '@/components/feed/QuestionCard'
@@ -16,19 +17,37 @@ type Question = Database['public']['Tables']['questions']['Row'] & {
 }
 type TrendingQuestion = Question & { recent_count: number }
 
+function ReferralCapture() {
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    const ref = searchParams.get('ref')
+    if (ref) localStorage.setItem('global_ref', ref)
+  }, [searchParams])
+  return null
+}
+
 export default function FeedPage() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [trending, setTrending] = useState<TrendingQuestion[]>([])
   const [category, setCategory] = useState('all')
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
+  const [predictedIds, setPredictedIds] = useState<Set<string>>(new Set())
   const [stats, setStats] = useState<{ todayPredictions: number; openCount: number; totalPool: number } | null>(null)
   const [tickKey, setTickKey] = useState(0)
   const supabase = createClient()
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setIsAdmin(user?.email === ADMIN_EMAIL)
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      setIsAdmin(user.email === ADMIN_EMAIL)
+      const [{ data: savedData }, { data: predData }] = await Promise.all([
+        (supabase as any).from('saved_questions').select('question_id').eq('user_id', user.id),
+        supabase.from('predictions').select('question_id').eq('user_id', user.id),
+      ])
+      setSavedIds(new Set((savedData ?? []).map((r: { question_id: string }) => r.question_id)))
+      setPredictedIds(new Set((predData ?? []).map((r: { question_id: string }) => r.question_id)))
     })
   }, [])
 
@@ -140,7 +159,9 @@ export default function FeedPage() {
     return () => { supabase.removeChannel(channel) }
   }, [category])
 
-  const active = questions.filter(q => q.status !== 'resolved')
+  const now = new Date()
+  const active = questions.filter(q => q.status !== 'resolved' && !(q.status === 'open' && new Date(q.closes_at) <= now))
+  const expired = questions.filter(q => q.status === 'open' && new Date(q.closes_at) <= now)
   const resolved = questions.filter(q => q.status === 'resolved')
   const hotIds = new Set(trending.map(t => t.id))
   const hotCounts: Record<string, number> = {}
@@ -148,6 +169,7 @@ export default function FeedPage() {
 
   return (
     <div>
+      <Suspense fallback={null}><ReferralCapture /></Suspense>
       <CategoryFilter selected={category} onChange={setCategory} />
 
       {/* Live stats bar */}
@@ -206,10 +228,35 @@ export default function FeedPage() {
                       isAdmin={isAdmin}
                       isHot={hotIds.has(q.id)}
                       recentCount={hotCounts[q.id]}
+                      initialSaved={savedIds.has(q.id)}
+                      isPredicted={predictedIds.has(q.id)}
                       onDelete={id => setQuestions(prev => prev.filter(x => x.id !== id))}
                     />
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Expired — waiting for admin to resolve */}
+            {expired.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-gray-500">รอเฉลย</h2>
+                  <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{expired.length}</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 opacity-60">
+                  {expired.map((q, i) => (
+                    <div key={q.id} className="animate-fadeInUp" style={{ animationDelay: `${i * 40}ms` }}>
+                      <QuestionCard
+                        question={q}
+                        isAdmin={isAdmin}
+                        initialSaved={savedIds.has(q.id)}
+                        isPredicted={predictedIds.has(q.id)}
+                        onDelete={id => setQuestions(prev => prev.filter(x => x.id !== id))}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -226,6 +273,8 @@ export default function FeedPage() {
                       <QuestionCard
                         question={q}
                         isAdmin={isAdmin}
+                        initialSaved={savedIds.has(q.id)}
+                        isPredicted={predictedIds.has(q.id)}
                         onDelete={id => setQuestions(prev => prev.filter(x => x.id !== id))}
                       />
                     </div>
@@ -250,6 +299,8 @@ export default function FeedPage() {
                       <QuestionCard
                         question={q}
                         isAdmin={isAdmin}
+                        initialSaved={savedIds.has(q.id)}
+                        isPredicted={predictedIds.has(q.id)}
                         onDelete={id => setTrending(prev => prev.filter(x => x.id !== id))}
                       />
                     </div>

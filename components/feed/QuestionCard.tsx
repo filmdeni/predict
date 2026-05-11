@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Gift, Bookmark, Trash2 } from 'lucide-react'
 import { useState, useTransition } from 'react'
+import { toast } from '@/components/ui/Toast'
 import { getPoolShares } from '@/lib/game/odds'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
@@ -72,13 +73,14 @@ function urgencyLevel(closesAt: string): 'normal' | 'soon' | 'critical' {
 interface Props {
   question: Question
   initialSaved?: boolean
+  isPredicted?: boolean
   isAdmin?: boolean
   isHot?: boolean
   recentCount?: number
   onDelete?: (id: string) => void
 }
 
-export default function QuestionCard({ question, initialSaved = false, isAdmin = false, isHot = false, recentCount, onDelete }: Props) {
+export default function QuestionCard({ question, initialSaved = false, isPredicted = false, isAdmin = false, isHot = false, recentCount, onDelete }: Props) {
   const shares = getPoolShares(question.pool)
   const options = question.options as { id: string; label: string }[]
   const isBinary = options.length === 2
@@ -125,11 +127,14 @@ export default function QuestionCard({ question, initialSaved = false, isAdmin =
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .insert({ user_id: user.id, question_id: question.id } as any)
       }
-      setSaved(prev => !prev)
+      const next = !saved
+      setSaved(next)
+      toast(next ? 'บันทึกแล้ว 🔖' : 'ลบออกจากรายการแล้ว')
     })
   }
 
-  const urgency = question.status === 'open' ? urgencyLevel(question.closes_at) : 'normal'
+  const isEffectivelyOpen = question.status === 'open' && new Date(question.closes_at) > new Date()
+  const urgency = isEffectivelyOpen ? urgencyLevel(question.closes_at) : 'normal'
   const borderClass = isHot
     ? 'border-orange-200 shadow-orange-50'
     : urgency === 'critical'
@@ -142,9 +147,15 @@ export default function QuestionCard({ question, initialSaved = false, isAdmin =
     <Link href={`/question/${question.id}`}>
       <article className={`relative bg-white border rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer h-full flex flex-col gap-3 ${borderClass}`}>
         {/* HOT badge */}
-        {isHot && !isAdmin && (
+        {isHot && !isAdmin && !isPredicted && (
           <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
             🔥 HOT
+          </div>
+        )}
+        {/* Predicted badge */}
+        {isPredicted && !isAdmin && (
+          <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-indigo-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+            🔮 ทายแล้ว
           </div>
         )}
         {/* admin delete */}
@@ -225,7 +236,7 @@ export default function QuestionCard({ question, initialSaved = false, isAdmin =
         {/* bottom */}
         <div className="flex items-center justify-between pt-2 border-t border-gray-100">
           <div className="flex items-center gap-2 text-xs text-gray-400 min-w-0">
-            {question.status === 'open' && (
+            {isEffectivelyOpen && (
               urgency === 'critical' ? (
                 <span className="flex items-center gap-1 text-red-500 font-semibold animate-pulse flex-shrink-0">
                   ⏰ {timeLeft(question.closes_at)}

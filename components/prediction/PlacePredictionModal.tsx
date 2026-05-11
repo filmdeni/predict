@@ -6,6 +6,7 @@ import { estimatePayout } from '@/lib/game/odds'
 import { getRank } from '@/lib/game/ranks'
 import type { Database } from '@/lib/supabase/types'
 import { X } from 'lucide-react'
+import { toast } from '@/components/ui/Toast'
 
 type Question = Database['public']['Tables']['questions']['Row']
 
@@ -13,7 +14,7 @@ interface Props {
   question: Question
   optionId: string
   onClose: () => void
-  onSuccess: () => void
+  onSuccess: (coinsWagered?: number) => void
 }
 
 const WAGER_CAPS: Record<string, number> = {
@@ -90,7 +91,8 @@ export default function PlacePredictionModal({ question, optionId, onClose, onSu
         return
       }
 
-      onSuccess()
+      toast(`ทายแล้ว! วาง ${coins.toLocaleString()} คะแนน 🔮`)
+      onSuccess(coins)
     } catch {
       setError('เกิดข้อผิดพลาด ลองใหม่อีกครั้ง')
       setLoading(false)

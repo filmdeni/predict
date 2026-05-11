@@ -88,6 +88,13 @@ export default function AdminQuestionsPage() {
     setQuestions(q => q.map(x => x.id === questionId ? { ...x, status: 'cancelled' } : x))
   }
 
+  async function closeQuestion(questionId: string) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from('questions') as any).update({ status: 'closed', closes_at: new Date().toISOString() }).eq('id', questionId)
+    if (error) { alert('Error: ' + error.message); return }
+    setQuestions(q => q.map(x => x.id === questionId ? { ...x, status: 'closed' } : x))
+  }
+
   const tabs = [
     { key: 'pending' as const,  label: 'รออนุมัติ' },
     { key: 'open' as const,     label: 'เปิดรับ' },
@@ -149,9 +156,10 @@ export default function AdminQuestionsPage() {
             const options = q.options as { id: string; label: string }[]
             const pool = q.pool as Record<string, number>
             const st = STATUS_LABEL[q.status] ?? STATUS_LABEL.open
+            const isExpired = q.status === 'open' && new Date(q.closes_at) <= new Date()
 
             return (
-              <div key={q.id} className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+              <div key={q.id} className={`bg-white rounded-2xl overflow-hidden shadow-sm border ${isExpired ? 'border-red-200' : 'border-gray-100'}`}>
                 {/* Card header */}
                 <div className="p-4 pb-3">
                   <div className="flex items-start gap-3">
@@ -159,6 +167,9 @@ export default function AdminQuestionsPage() {
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <span className="text-xs text-gray-400">{q.categories.emoji} {q.categories.name_th}</span>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.color}`}>{st.label}</span>
+                        {isExpired && (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-600">⏰ หมดเวลาแล้ว</span>
+                        )}
                       </div>
                       <p className="text-sm font-semibold text-gray-900 leading-snug">{q.title}</p>
                     </div>
@@ -255,18 +266,28 @@ export default function AdminQuestionsPage() {
                   )}
 
                   {q.status !== 'resolved' && q.status !== 'pending' && (
-                    <button
-                      onClick={() => resolve(q.id)}
-                      disabled={!selected[q.id] || resolving === q.id}
-                      className="w-full py-2.5 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl transition-colors"
-                    >
-                      <CheckCircle2 size={15} />
-                      {resolving === q.id
-                        ? 'กำลังเฉลย...'
-                        : selected[q.id]
-                          ? `เฉลย — "${options.find(o => o.id === selected[q.id])?.label}"`
-                          : 'เลือกคำตอบที่ถูกก่อน'}
-                    </button>
+                    <div className="flex gap-2">
+                      {q.status === 'open' && (
+                        <button
+                          onClick={() => closeQuestion(q.id)}
+                          className="px-4 py-2.5 flex items-center justify-center gap-1.5 border border-amber-300 text-amber-600 hover:bg-amber-50 text-sm font-semibold rounded-xl transition-colors flex-shrink-0"
+                        >
+                          <Clock size={14} /> ปิดรับ
+                        </button>
+                      )}
+                      <button
+                        onClick={() => resolve(q.id)}
+                        disabled={!selected[q.id] || resolving === q.id}
+                        className="flex-1 py-2.5 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl transition-colors"
+                      >
+                        <CheckCircle2 size={15} />
+                        {resolving === q.id
+                          ? 'กำลังเฉลย...'
+                          : selected[q.id]
+                            ? `เฉลย — "${options.find(o => o.id === selected[q.id])?.label}"`
+                            : 'เลือกคำตอบที่ถูกก่อน'}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

@@ -42,27 +42,36 @@ export default function QuestionPage() {
   const [success, setSuccess] = useState(false)
   const [user, setUser] = useState<import('@supabase/supabase-js').User | null>(null)
   const [trendingOption, setTrendingOption] = useState<{ id: string; label: string; delta: number } | null>(null)
+  const [myPrediction, setMyPrediction] = useState<{ option_id: string; coins_wagered: number; is_correct: boolean | null; coins_won: number | null } | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user))
   }, [])
 
-  // store ref param from URL into localStorage so PlacePredictionModal can use it
+  // store ref param (from URL or global feed referral) into localStorage
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    const ref = params.get('ref')
+    const ref = params.get('ref') ?? localStorage.getItem('global_ref')
     if (ref) localStorage.setItem(`ref:${id}`, ref)
   }, [id])
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
-        .from('questions')
-        .select('*, categories(name_th, emoji)')
-        .eq('id', id)
-        .single()
+      const [{ data }, { data: { user } }] = await Promise.all([
+        supabase.from('questions').select('*, categories(name_th, emoji)').eq('id', id).single(),
+        supabase.auth.getUser(),
+      ])
       setQuestion(data as unknown as Question)
+      if (user) {
+        const { data: pred } = await supabase
+          .from('predictions')
+          .select('option_id, coins_wagered, is_correct, coins_won')
+          .eq('question_id', id)
+          .eq('user_id', user.id)
+          .maybeSingle()
+        if (pred) setMyPrediction(pred as { option_id: string; coins_wagered: number; is_correct: boolean | null; coins_won: number | null })
+      }
       setLoading(false)
     }
     load()
@@ -218,8 +227,56 @@ export default function QuestionPage() {
         </div>
       </div>
 
-      {/* Option buttons */}
-      {isOpen && (
+      {/* My existing prediction */}
+      {(myPrediction || success) && (() => {
+        const pred = myPrediction
+        const chosenLabel = pred ? options.find(o => o.id === pred.option_id)?.label : options.find(o => o.id === selectedOption)?.label
+        const isResolved = pred && pred.is_correct !== null
+        return (
+          <div className={`rounded-2xl p-4 border ${
+            isResolved
+              ? pred!.is_correct
+                ? 'bg-green-50 border-green-200'
+                : 'bg-red-50 border-red-200'
+              : 'bg-indigo-50 border-indigo-200'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">
+                  {isResolved ? (pred!.is_correct ? '✅' : '❌') : '🔮'}
+                </span>
+                <div>
+                  <p className="text-xs text-gray-500 font-medium">การทายของคุณ</p>
+                  <p className="text-sm font-bold text-gray-900">{chosenLabel ?? '—'}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                {pred && (
+                  <p className="text-xs text-gray-500 flex items-center gap-0.5 justify-end">
+                    <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[8px] leading-none">P</span>
+                    {pred.coins_wagered.toLocaleString()} คะแนน
+                  </p>
+                )}
+                {isResolved && pred!.is_correct && pred!.coins_won && pred!.coins_won > 0 && (
+                  <p className="text-sm font-bold text-green-600 flex items-center gap-0.5 justify-end">
+                    +<span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[8px] leading-none">P</span>
+                    {pred!.coins_won.toLocaleString()}
+                  </p>
+                )}
+                {isResolved && !pred!.is_correct && (
+                  <p className="text-xs text-red-500 font-medium">ทายผิด</p>
+                )}
+                {!isResolved && !success && (
+                  <p className="text-xs text-indigo-500 font-medium">รอผล</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Option buttons — hidden if already predicted */}
+      {isOpen && !myPrediction && !success && (
         <div className="space-y-2">
           <p className="text-sm text-gray-500 font-medium">คุณคิดว่าผลจะเป็นอย่างไร?</p>
           {options.map((opt) => {
@@ -277,7 +334,7 @@ export default function QuestionPage() {
       )}
 
       {/* CTA */}
-      {isOpen && selectedOption && (
+      {isOpen && !myPrediction && !success && selectedOption && (
         <button
           onClick={() => user ? setShowModal(true) : router.push(`/login?next=/question/${id}`)}
           className="w-full py-4 active:scale-[0.98] text-white font-bold rounded-xl transition-all"
@@ -287,8 +344,8 @@ export default function QuestionPage() {
         </button>
       )}
 
-      {/* Success */}
-      {success && (
+      {/* Success toast */}
+      {success && !myPrediction && (
         <div className="bg-green-50 border border-green-200 rounded-2xl p-6 text-center space-y-2">
           <div className="text-4xl">🎯</div>
           <p className="text-green-700 font-bold text-lg">ทายแล้ว! ลุ้นได้เลย 🔮</p>
@@ -314,9 +371,10 @@ export default function QuestionPage() {
           question={question}
           optionId={selectedOption}
           onClose={() => setShowModal(false)}
-          onSuccess={() => {
+          onSuccess={(coinsWagered?: number) => {
             setShowModal(false)
             setSuccess(true)
+            setMyPrediction({ option_id: selectedOption!, coins_wagered: coinsWagered ?? 0, is_correct: null, coins_won: null })
             setSelectedOption(null)
           }}
         />

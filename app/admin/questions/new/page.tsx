@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, ImagePlus, X } from 'lucide-react'
+import { useRef } from 'react'
 
 interface Option { id: string; label: string }
 
@@ -20,8 +21,25 @@ export default function NewQuestionPage() {
     { id: 'no', label: 'ไม่ใช่' },
   ])
   const [closesAt, setClosesAt] = useState('')
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [imageUploading, setImageUploading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImageFile(file)
+    setImagePreview(URL.createObjectURL(file))
+  }
+
+  function removeImage() {
+    setImageFile(null)
+    setImagePreview(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
 
   useEffect(() => {
     async function init() {
@@ -62,6 +80,25 @@ export default function NewQuestionPage() {
     setLoading(true)
     setError(null)
 
+    let imageUrl: string | null = null
+    if (imageFile) {
+      setImageUploading(true)
+      const ext = imageFile.name.split('.').pop()
+      const path = `questions/${Date.now()}.${ext}`
+      const { error: uploadErr } = await supabase.storage
+        .from('question-images')
+        .upload(path, imageFile, { upsert: true })
+      if (uploadErr) {
+        setError('อัพโหลดรูปไม่ได้: ' + uploadErr.message)
+        setLoading(false)
+        setImageUploading(false)
+        return
+      }
+      const { data: urlData } = supabase.storage.from('question-images').getPublicUrl(path)
+      imageUrl = urlData.publicUrl
+      setImageUploading(false)
+    }
+
     const pool = Object.fromEntries(options.map(o => [o.id, 0]))
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -75,6 +112,7 @@ export default function NewQuestionPage() {
       total_pool: 0,
       closes_at: new Date(closesAt).toISOString(),
       status: 'open' as const,
+      image_url: imageUrl,
     }
     const { error: err } = await supabase.from('questions').insert(payload as never)
 
@@ -134,6 +172,39 @@ export default function NewQuestionPage() {
             onChange={e => setDescription(e.target.value)}
             className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-400 resize-none"
           />
+        </div>
+
+        {/* Image upload */}
+        <div>
+          <label className="text-sm font-medium text-gray-700 block mb-1.5">รูปประกอบ <span className="text-gray-400 font-normal">(ไม่บังคับ)</span></label>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageChange}
+            className="hidden"
+          />
+          {imagePreview ? (
+            <div className="relative w-full rounded-xl overflow-hidden border border-gray-200">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={imagePreview} alt="preview" className="w-full max-h-48 object-cover" />
+              <button
+                type="button"
+                onClick={removeImage}
+                className="absolute top-2 right-2 p-1 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-xl py-8 text-sm text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <ImagePlus size={20} /> คลิกเพื่ออัพโหลดรูป
+            </button>
+          )}
         </div>
 
         {/* Options */}
@@ -196,7 +267,7 @@ export default function NewQuestionPage() {
             disabled={loading}
             className="flex-1 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-700 disabled:opacity-40 transition-colors"
           >
-            {loading ? 'กำลังสร้าง...' : 'สร้างคำถาม'}
+            {imageUploading ? 'กำลังอัพโหลดรูป...' : loading ? 'กำลังสร้าง...' : 'สร้างคำถาม'}
           </button>
         </div>
       </form>
