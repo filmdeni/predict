@@ -18,13 +18,20 @@ export default function LeaderboardPage() {
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [tab, setTab] = useState<'reputation' | 'winrate' | 'streak'>('reputation')
+  const [tab, setTab] = useState<'reputation' | 'coins' | 'winrate' | 'streak'>('reputation')
   const supabase = createClient()
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     else setRefreshing(true)
-    if (tab === 'winrate') {
+    if (tab === 'coins') {
+      const { data } = await supabase
+        .from('users')
+        .select('*')
+        .order('coins', { ascending: false })
+        .limit(20)
+      setUsers(data ?? [])
+    } else if (tab === 'winrate') {
       const { data } = await supabase
         .from('users')
         .select('*')
@@ -89,18 +96,24 @@ export default function LeaderboardPage() {
       {/* Tabs */}
       <div className="flex gap-1.5 bg-gray-100 rounded-xl p-1">
         {([
-          { key: 'reputation', label: 'คะแนน' },
+          { key: 'reputation', label: 'Rep' },
+          { key: 'coins', label: 'คะแนน' },
           { key: 'winrate', label: 'ทายถูก' },
           { key: 'streak', label: 'Streak' },
         ] as const).map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex-1 py-1.5 text-sm font-medium rounded-lg transition-all ${
+            className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${
               tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
             }`}
           >
-            {t.label}
+            {t.key === 'coins' ? (
+              <span className="flex items-center justify-center gap-0.5">
+                คะแนน
+                <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-yellow-400 text-white text-[8px] font-bold leading-none">P</span>
+              </span>
+            ) : t.label}
           </button>
         ))}
       </div>
@@ -150,6 +163,11 @@ export default function LeaderboardPage() {
                     <div className="flex items-center gap-1.5 justify-end">
                       <span className="text-sm font-bold text-gray-900">{Number(u.reputation ?? 0).toLocaleString()}</span>
                       <span className="text-xs text-gray-400">rep</span>
+                    </div>
+                  ) : tab === 'coins' ? (
+                    <div className="flex items-center gap-1 justify-end">
+                      <span className="text-sm font-bold text-gray-900">{Number(u.coins).toLocaleString()}</span>
+                      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-yellow-400 text-white text-[9px] font-bold leading-none">P</span>
                     </div>
                   ) : tab === 'winrate' ? (
                     <div>
