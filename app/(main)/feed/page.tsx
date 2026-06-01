@@ -507,14 +507,9 @@ export default function FeedPage() {
             {/* ── Hero Banner ── */}
             {heroQuestion && (
               <section className="animate-fadeInUp">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">🌟</span>
-                    <h2 className="text-sm font-bold text-gray-900">คำถามประจำวัน</h2>
-                  </div>
-                  <Link href="/submit" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-900 text-white text-xs font-semibold hover:bg-gray-700 transition-colors">
-                    + เสนอคำถาม
-                  </Link>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-base">🌟</span>
+                  <h2 className="text-sm font-bold text-gray-900">คำถามประจำวัน</h2>
                 </div>
                 <div className="max-w-sm">
                   <QuestionCard
@@ -563,9 +558,7 @@ export default function FeedPage() {
                       ⠿ ลาก-วางเพื่อเรียงลำดับ
                     </span>
                   )}
-                  <Link href="/submit" className="ml-auto flex items-center gap-1 px-3 py-1.5 rounded-full bg-gray-900 text-white text-xs font-semibold hover:bg-gray-700 transition-colors">
-                    + เสนอคำถาม
-                  </Link>
+
                 </div>
                 <DraggableGrid
                   items={mainGridOrdered.length > 0 ? mainGridOrdered : mainGrid}
