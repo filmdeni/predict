@@ -4,10 +4,12 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Search } from 'lucide-react'
+import { Search, ShieldCheck } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 import SearchModal from './SearchModal'
 import NotificationBell from './NotificationBell'
+
+const ADMIN_EMAIL = 'zwwzww19192@gmail.com'
 
 export default function Header() {
   const [user, setUser] = useState<User | null>(null)
@@ -72,6 +74,12 @@ export default function Header() {
         <span className="text-[10px] font-medium text-gray-400 tracking-wide mt-0.5">เกมทายกระแสสังคม</span>
       </Link>
       <div className="flex items-center gap-3">
+        {user?.email === ADMIN_EMAIL && (
+          <Link href="/admin" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-gray-900 text-white text-xs font-medium hover:bg-gray-700 transition-colors">
+            <ShieldCheck size={13} />
+            Admin
+          </Link>
+        )}
         <button onClick={() => setShowSearch(true)} className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors">
           <Search size={18} />
         </button>

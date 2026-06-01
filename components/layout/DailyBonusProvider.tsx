@@ -37,7 +37,7 @@ export default function DailyBonusProvider() {
       let currentRank = (profile as { rank: RankTier }).rank
 
       channel = supabase
-        .channel(`rankwatch:${user.id}`)
+        .channel(`rankwatch:${user.id}:${Date.now()}`)
         .on('postgres_changes', {
           event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${user.id}`
         }, (payload) => {

@@ -48,7 +48,7 @@ export default function PlacePredictionModal({ question, optionId, onClose, onSu
     })
   }, [])
 
-  const option = question.options.find(o => o.id === optionId)
+  const option = (question.options as { id: string; label: string }[]).find(o => o.id === optionId)
   const payout = estimatePayout(question.pool, optionId, coins)
   const pool = question.pool as Record<string, number>
   const totalPool = Object.values(pool).reduce((s, v) => s + v, 0)

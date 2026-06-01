@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Trash2 } from 'lucide-react'
 import CardStylePicker, { type CardStyle } from '@/components/question/CardStylePicker'
@@ -10,55 +10,67 @@ import ImageUpload from '@/components/question/ImageUpload'
 
 interface Option { id: string; label: string; icon_url?: string | null }
 
-export default function NewQuestionPage() {
+export default function EditQuestionPage() {
   const router = useRouter()
+  const { id } = useParams<{ id: string }>()
   const supabase = createClient()
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [categoryId, setCategoryId] = useState<number | null>(null)
   const [categories, setCategories] = useState<{ id: number; name_th: string; emoji: string }[]>([])
-  const [options, setOptions] = useState<Option[]>([
-    { id: 'yes', label: 'ใช่' },
-    { id: 'no', label: 'ไม่ใช่' },
-  ])
+  const [options, setOptions] = useState<Option[]>([])
   const [closesAt, setClosesAt] = useState('')
   const [cardStyle, setCardStyle] = useState<CardStyle>('auto')
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [initializing, setInitializing] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     async function init() {
-      const { data } = await supabase.from('categories').select('id, name_th, emoji').order('sort_order')
-      const cats = (data ?? []) as { id: number; name_th: string; emoji: string }[]
-      setCategories(cats)
-      if (cats[0]) setCategoryId(cats[0].id)
+      const [{ data: cats }, { data: q }] = await Promise.all([
+        supabase.from('categories').select('id, name_th, emoji').order('sort_order'),
+        supabase.from('questions').select('*').eq('id', id).single(),
+      ])
+      setCategories((cats ?? []) as { id: number; name_th: string; emoji: string }[])
+      if (!q) { router.replace('/admin/questions'); return }
 
-      // default closes_at = 7 วันข้างหน้า (local time สำหรับ datetime-local input)
-      const d = new Date()
-      d.setDate(d.getDate() + 7)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const row = q as any
+      setTitle(row.title)
+      setDescription(row.description ?? '')
+      setCategoryId(row.category_id)
+      setOptions(row.options as Option[])
+      setCardStyle((row.card_style ?? 'auto') as CardStyle)
+      setImageUrl(row.image_url ?? null)
+
+      // convert ISO → datetime-local (local time)
+      const d = new Date(row.closes_at)
       const pad = (n: number) => String(n).padStart(2, '0')
-      setClosesAt(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`)
+      setClosesAt(
+        `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+      )
+      setInitializing(false)
     }
     init()
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
 
   function addOption() {
-    const id = `opt${Date.now()}`
-    setOptions(o => [...o, { id, label: '' }])
+    setOptions(o => [...o, { id: `opt${Date.now()}`, label: '' }])
   }
 
-  function removeOption(id: string) {
-    setOptions(o => o.filter(x => x.id !== id))
+  function removeOption(oid: string) {
+    setOptions(o => o.filter(x => x.id !== oid))
   }
 
-  function updateOption(id: string, label: string) {
-    setOptions(o => o.map(x => x.id === id ? { ...x, label } : x))
+  function updateOption(oid: string, label: string) {
+    setOptions(o => o.map(x => x.id === oid ? { ...x, label } : x))
   }
 
-  function updateOptionIcon(id: string, icon_url: string | null) {
-    setOptions(o => o.map(x => x.id === id ? { ...x, icon_url } : x))
+  function updateOptionIcon(oid: string, icon_url: string | null) {
+    setOptions(o => o.map(x => x.id === oid ? { ...x, icon_url } : x))
   }
 
   async function submit(e: React.FormEvent) {
@@ -71,32 +83,39 @@ export default function NewQuestionPage() {
     setLoading(true)
     setError(null)
 
-    const pool = Object.fromEntries(options.map(o => [o.id, 0]))
-    const { data: { user } } = await supabase.auth.getUser()
-
-    const payload = {
-      title: title.trim(),
-      description: description.trim() || null,
-      category_id: categoryId,
-      created_by: user!.id,
-      options,
-      pool,
-      total_pool: 0,
-      closes_at: new Date(closesAt).toISOString(),
-      status: 'open' as const,
-      image_url: imageUrl,
-      card_style: cardStyle,
-    }
-    const { error: err } = await supabase.from('questions').insert(payload as never)
+    const closesAtIso = new Date(closesAt).toISOString()
+    const { error: err } = await supabase
+      .from('questions')
+      .update({
+        title: title.trim(),
+        description: description.trim() || null,
+        category_id: categoryId,
+        options,
+        closes_at: closesAtIso,
+        image_url: imageUrl,
+        card_style: cardStyle,
+        status: new Date(closesAtIso) > new Date() ? 'open' : 'closed',
+      } as never)
+      .eq('id', id)
 
     if (err) { setError(err.message); setLoading(false); return }
     router.push('/admin/questions')
   }
 
+  if (initializing) {
+    return (
+      <div className="max-w-lg mx-auto p-6 space-y-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="h-12 bg-gray-100 rounded-xl animate-pulse" />
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-lg mx-auto p-6 space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">สร้างคำถามใหม่</h1>
+        <h1 className="text-xl font-bold text-gray-900">แก้ไขคำถาม</h1>
         <p className="text-sm text-gray-400 mt-0.5">Admin only</p>
       </div>
 
@@ -217,7 +236,7 @@ export default function NewQuestionPage() {
             disabled={loading}
             className="flex-1 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-700 disabled:opacity-40 transition-colors"
           >
-            {loading ? 'กำลังสร้าง...' : 'สร้างคำถาม'}
+            {loading ? 'กำลังบันทึก...' : 'บันทึก'}
           </button>
         </div>
       </form>

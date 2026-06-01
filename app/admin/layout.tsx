@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { LayoutDashboard, HelpCircle, Users, ChevronRight } from 'lucide-react'
+import { LayoutDashboard, HelpCircle, Users, ChevronRight, ArrowLeftRight } from 'lucide-react'
 
 const ADMIN_EMAIL = 'zwwzww19192@gmail.com'
 
@@ -43,8 +43,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Sidebar */}
       <aside className="w-56 shrink-0 bg-white border-r border-gray-100 flex flex-col">
         <div className="px-5 py-5 border-b border-gray-100">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Admin</p>
-          <p className="text-lg font-bold text-gray-900 mt-0.5">ภาวนา</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Admin</p>
+              <p className="text-lg font-bold text-gray-900 mt-0.5">ภาวนา</p>
+            </div>
+            <Link
+              href="/feed"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-orange-50 text-orange-600 hover:bg-orange-100 transition-all"
+            >
+              <ArrowLeftRight size={13} />
+              ผู้ใช้
+            </Link>
+          </div>
         </div>
         <nav className="flex-1 p-3 space-y-0.5">
           {NAV.map(({ href, label, icon: Icon, exact }) => {
@@ -66,14 +77,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             )
           })}
         </nav>
-        <div className="p-4 border-t border-gray-100">
-          <Link
-            href="/feed"
-            className="flex items-center gap-2 text-xs text-gray-400 hover:text-gray-700 transition-colors"
-          >
-            ← กลับแอป
-          </Link>
-        </div>
       </aside>
 
       {/* Main */}

@@ -3,21 +3,32 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2, CheckCircle2, Clock, Users, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, CheckCircle2, X, Award } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
-
 
 type Question = Database['public']['Tables']['questions']['Row'] & {
   categories: { name_th: string; emoji: string }
+  users: { display_name: string; username: string } | null
 }
 
+type TabKey = 'all' | 'pending' | 'open' | 'closed' | 'resolved' | 'cancelled'
+
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
-  pending:  { label: 'รออนุมัติ',  color: 'bg-blue-100 text-blue-700' },
-  open:     { label: 'เปิดรับ',    color: 'bg-emerald-100 text-emerald-700' },
-  closed:   { label: 'ปิดรับแล้ว', color: 'bg-amber-100 text-amber-700' },
-  resolved: { label: 'เฉลยแล้ว',  color: 'bg-gray-100 text-gray-500' },
-  cancelled:{ label: 'ยกเลิก',    color: 'bg-red-100 text-red-500' },
+  pending:   { label: 'รออนุมัติ',  color: 'bg-blue-100 text-blue-700' },
+  open:      { label: 'อนุมัติแล้ว', color: 'bg-emerald-100 text-emerald-700' },
+  closed:    { label: 'ปิดแล้ว',    color: 'bg-amber-100 text-amber-700' },
+  resolved:  { label: 'เฉลยแล้ว',  color: 'bg-purple-100 text-purple-700' },
+  cancelled: { label: 'ปฏิเสส',    color: 'bg-red-100 text-red-500' },
 }
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'all',       label: 'ทั้งหมด' },
+  { key: 'pending',   label: 'รออนุมัติ' },
+  { key: 'open',      label: 'อนุมัติแล้ว' },
+  { key: 'closed',    label: 'ปิดแล้ว' },
+  { key: 'resolved',  label: 'เฉลยแล้ว' },
+  { key: 'cancelled', label: 'ปฏิเสส' },
+]
 
 export default function AdminQuestionsPage() {
   const router = useRouter()
@@ -25,11 +36,12 @@ export default function AdminQuestionsPage() {
 
   const [questions, setQuestions] = useState<Question[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'pending' | 'open' | 'closed' | 'resolved'>('pending')
-  const [selected, setSelected] = useState<Record<string, string>>({})
-  const [resolving, setResolving] = useState<string | null>(null)
-  const [deleting, setDeleting] = useState<string | null>(null)
+  const [tab, setTab] = useState<TabKey>('all')
+  const [resolveModal, setResolveModal] = useState<Question | null>(null)
+  const [resolveOption, setResolveOption] = useState<string>('')
+  const [resolving, setResolving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   useEffect(() => { load() }, [])
 
@@ -37,262 +49,282 @@ export default function AdminQuestionsPage() {
     setLoading(true)
     const { data } = await supabase
       .from('questions')
-      .select('*, categories(name_th, emoji)')
+      .select('*, categories(name_th, emoji), users(display_name, username)')
       .order('created_at', { ascending: false })
     setQuestions((data ?? []) as Question[])
     setLoading(false)
   }
 
-  async function resolve(questionId: string) {
-    const optionId = selected[questionId]
-    if (!optionId) return
-    setResolving(questionId)
+  async function approve(id: string) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any).rpc('resolve_question', {
-      p_question_id: questionId,
-      p_correct_option: optionId,
-    })
-    if (error) {
-      alert('Error: ' + error.message)
-    } else {
-      setQuestions(q =>
-        q.map(x => x.id === questionId ? { ...x, status: 'resolved', correct_option: optionId } : x)
-      )
-    }
-    setResolving(null)
+    await (supabase.from('questions') as any).update({ status: 'open' }).eq('id', id)
+    setQuestions(q => q.map(x => x.id === id ? { ...x, status: 'open' } : x))
   }
 
-  async function deleteQuestion(questionId: string) {
-    setDeleting(questionId)
-    const { error } = await supabase.from('questions').delete().eq('id', questionId)
-    if (error) {
-      alert('Error: ' + error.message)
-    } else {
-      setQuestions(q => q.filter(x => x.id !== questionId))
+  async function reject(id: string) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('questions') as any).update({ status: 'cancelled' }).eq('id', id)
+    setQuestions(q => q.map(x => x.id === id ? { ...x, status: 'cancelled' } : x))
+  }
+
+  async function resolve() {
+    if (!resolveModal || !resolveOption) return
+    setResolving(true)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).rpc('resolve_question', {
+      p_question_id: resolveModal.id,
+      p_correct_option: resolveOption,
+    })
+    if (error) { alert('Error: ' + error.message) }
+    else {
+      setQuestions(q =>
+        q.map(x => x.id === resolveModal.id ? { ...x, status: 'resolved', correct_option: resolveOption } : x)
+      )
+      setResolveModal(null)
+      setResolveOption('')
     }
+    setResolving(false)
+  }
+
+  async function deleteQuestion(id: string) {
+    setDeleting(id)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).rpc('admin_delete_question', { p_question_id: id })
+    if (error) { alert('Error: ' + error.message) }
+    else { setQuestions(q => q.filter(x => x.id !== id)) }
     setDeleting(null)
     setConfirmDelete(null)
   }
 
-  async function approvePending(questionId: string) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.from('questions') as any).update({ status: 'open' }).eq('id', questionId)
-    if (error) { alert('Error: ' + error.message); return }
-    setQuestions(q => q.map(x => x.id === questionId ? { ...x, status: 'open' } : x))
-  }
-
-  async function rejectPending(questionId: string) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.from('questions') as any).update({ status: 'cancelled' }).eq('id', questionId)
-    if (error) { alert('Error: ' + error.message); return }
-    setQuestions(q => q.map(x => x.id === questionId ? { ...x, status: 'cancelled' } : x))
-  }
-
-  async function closeQuestion(questionId: string) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.from('questions') as any).update({ status: 'closed', closes_at: new Date().toISOString() }).eq('id', questionId)
-    if (error) { alert('Error: ' + error.message); return }
-    setQuestions(q => q.map(x => x.id === questionId ? { ...x, status: 'closed' } : x))
-  }
-
-  const tabs = [
-    { key: 'pending' as const,  label: 'รออนุมัติ' },
-    { key: 'open' as const,     label: 'เปิดรับ' },
-    { key: 'closed' as const,   label: 'ปิดแล้ว' },
-    { key: 'resolved' as const, label: 'เฉลยแล้ว' },
-  ]
-
-  const filtered = questions.filter(q => q.status === tab)
+  const filtered = tab === 'all' ? questions : questions.filter(q => q.status === tab)
 
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-5">
+    <div className="p-6 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Admin Panel</h1>
-          <p className="text-sm text-gray-400 mt-0.5">จัดการคำถามทั้งหมด</p>
+          <h1 className="text-xl font-bold text-gray-900">จัดการคำถาม</h1>
+          <p className="text-sm text-gray-400 mt-0.5">อนุมัติ / ปฏิเสส / เฉลย / ลบ</p>
         </div>
         <button
           onClick={() => router.push('/admin/questions/new')}
           className="flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white text-sm font-semibold rounded-xl hover:bg-gray-700 transition-colors"
         >
-          <Plus size={15} /> สร้างคำถาม
+          <Plus size={15} /> สร้าง Prediction
         </button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-2">
-        {tabs.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`rounded-xl p-3 text-center border transition-all ${
-              tab === t.key ? 'bg-gray-900 border-gray-900' : 'bg-white border-gray-100 hover:border-gray-300'
-            }`}
-          >
-            <p className={`text-2xl font-bold ${tab === t.key ? 'text-white' : 'text-gray-900'}`}>
-              {questions.filter(q => q.status === t.key).length}
-            </p>
-            <p className={`text-xs mt-0.5 ${tab === t.key ? 'text-gray-300' : 'text-gray-400'}`}>{t.label}</p>
-          </button>
-        ))}
+      {/* Tabs */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {TABS.map(t => {
+          const count = t.key === 'all' ? questions.length : questions.filter(q => q.status === t.key).length
+          const active = tab === t.key
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${
+                active
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-400'
+              }`}
+            >
+              {t.label}
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+                active ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
+              }`}>
+                {count}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
-      {/* Question list */}
-      {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-36 bg-white rounded-xl animate-pulse border border-gray-100" />
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <p className="text-3xl mb-2">{tab === 'resolved' ? '✅' : '📭'}</p>
-          <p className="text-sm">ไม่มีคำถามในกลุ่มนี้</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filtered.map(q => {
-            const options = q.options as { id: string; label: string }[]
-            const pool = q.pool as Record<string, number>
-            const st = STATUS_LABEL[q.status] ?? STATUS_LABEL.open
-            const isExpired = q.status === 'open' && new Date(q.closes_at) <= new Date()
+      {/* Table */}
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+        {loading ? (
+          <div className="space-y-px">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-14 bg-gray-50 animate-pulse" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-16 text-gray-400">
+            <p className="text-3xl mb-2">📭</p>
+            <p className="text-sm">ไม่มีคำถามในกลุ่มนี้</p>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 text-xs text-gray-400 font-medium">
+                <th className="text-left px-5 py-3">คำถาม</th>
+                <th className="text-left px-4 py-3 w-32">โดย</th>
+                <th className="text-center px-4 py-3 w-20">ผู้ร่วม</th>
+                <th className="text-center px-4 py-3 w-28">สถานะ</th>
+                <th className="text-right px-5 py-3 w-64">การดำเนินการ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filtered.map(q => {
+                const st = STATUS_LABEL[q.status] ?? STATUS_LABEL.open
+                const options = q.options as { id: string; label: string }[]
+                const closesDate = new Date(q.closes_at).toLocaleDateString('th-TH', {
+                  day: 'numeric', month: 'short', year: '2-digit'
+                })
+                const createdDate = new Date(q.created_at).toLocaleDateString('th-TH', {
+                  day: 'numeric', month: 'short', year: '2-digit'
+                })
 
-            return (
-              <div key={q.id} className={`bg-white rounded-2xl overflow-hidden shadow-sm border ${isExpired ? 'border-red-200' : 'border-gray-100'}`}>
-                {/* Card header */}
-                <div className="p-4 pb-3">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className="text-xs text-gray-400">{q.categories.emoji} {q.categories.name_th}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.color}`}>{st.label}</span>
-                        {isExpired && (
-                          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-600">⏰ หมดเวลาแล้ว</span>
+                return (
+                  <tr key={q.id} className="hover:bg-gray-50/60 transition-colors group">
+                    {/* คำถาม */}
+                    <td className="px-5 py-3">
+                      <p className="font-medium text-gray-900 leading-snug line-clamp-1">{q.title}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {q.categories.emoji} {q.categories.name_th} · {createdDate} → {closesDate}
+                      </p>
+                    </td>
+
+                    {/* โดย */}
+                    <td className="px-4 py-3">
+                      <p className="text-gray-700 truncate max-w-[120px]">
+                        {q.users?.display_name ?? '—'}
+                      </p>
+                    </td>
+
+                    {/* ผู้ร่วม */}
+                    <td className="px-4 py-3 text-center">
+                      <span className="text-gray-700 font-medium">{q.predictions_count.toLocaleString()}</span>
+                    </td>
+
+                    {/* สถานะ */}
+                    <td className="px-4 py-3 text-center">
+                      <span className={`inline-block text-xs px-2.5 py-1 rounded-full font-semibold ${st.color}`}>
+                        {st.label}
+                        {q.status === 'resolved' && q.correct_option && (
+                          <span className="ml-1">
+                            ✓ {options.find(o => o.id === q.correct_option)?.label}
+                          </span>
+                        )}
+                      </span>
+                    </td>
+
+                    {/* การดำเนินการ */}
+                    <td className="px-5 py-3">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* แก้ไข */}
+                        <button
+                          onClick={() => router.push(`/admin/questions/edit/${q.id}`)}
+                          className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                        >
+                          <Pencil size={11} /> แก้ไข
+                        </button>
+
+                        {/* อนุมัติ (pending only) */}
+                        {q.status === 'pending' && (
+                          <button
+                            onClick={() => approve(q.id)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors"
+                          >
+                            <CheckCircle2 size={11} /> อนุมัติ
+                          </button>
+                        )}
+
+                        {/* ปฏิเสส (pending only) */}
+                        {q.status === 'pending' && (
+                          <button
+                            onClick={() => reject(q.id)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                          >
+                            <X size={11} /> ปฏิเสส
+                          </button>
+                        )}
+
+                        {/* เฉลย (open or closed) */}
+                        {(q.status === 'open' || q.status === 'closed') && (
+                          <button
+                            onClick={() => { setResolveModal(q); setResolveOption('') }}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors"
+                          >
+                            <Award size={11} /> เฉลย
+                          </button>
+                        )}
+
+                        {/* ลบ */}
+                        {confirmDelete === q.id ? (
+                          <>
+                            <button
+                              onClick={() => setConfirmDelete(null)}
+                              className="px-2.5 py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50"
+                            >
+                              ยกเลิก
+                            </button>
+                            <button
+                              onClick={() => deleteQuestion(q.id)}
+                              disabled={deleting === q.id}
+                              className="px-2.5 py-1.5 text-xs font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-50"
+                            >
+                              {deleting === q.id ? '...' : 'ยืนยันลบ'}
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDelete(q.id)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-400 border border-gray-200 rounded-lg hover:text-red-500 hover:border-red-200 transition-colors"
+                          >
+                            <Trash2 size={11} /> ลบ
+                          </button>
                         )}
                       </div>
-                      <p className="text-sm font-semibold text-gray-900 leading-snug">{q.title}</p>
-                    </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
 
-                    {/* Delete */}
-                    {confirmDelete === q.id ? (
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => setConfirmDelete(null)}
-                          className="px-2 py-1 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50"
-                        >
-                          ยกเลิก
-                        </button>
-                        <button
-                          onClick={() => deleteQuestion(q.id)}
-                          disabled={deleting === q.id}
-                          className="px-2 py-1 text-xs text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-50"
-                        >
-                          {deleting === q.id ? '...' : 'ยืนยัน'}
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setConfirmDelete(q.id)}
-                        className="p-1.5 text-gray-300 hover:text-red-400 transition-colors flex-shrink-0"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Meta */}
-                  <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
-                    <span className="flex items-center gap-1"><Users size={11} /> {q.predictions_count}</span>
-                    <span className="flex items-center gap-1">
-                      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[9px] leading-none">P</span>
-                      {q.total_pool.toLocaleString()} คะแนน
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock size={11} />
-                      {new Date(q.closes_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Options */}
-                <div className="px-4 pb-4 space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    {options.map(opt => {
-                      const isCorrect = opt.id === q.correct_option
-                      const isSelected = selected[q.id] === opt.id
-                      const resolved = q.status === 'resolved'
-
-                      return (
-                        <button
-                          key={opt.id}
-                          disabled={resolved}
-                          onClick={() => setSelected(s => ({ ...s, [q.id]: opt.id }))}
-                          className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm transition-all text-left ${
-                            resolved
-                              ? isCorrect
-                                ? 'bg-emerald-50 border-emerald-200 text-emerald-800 cursor-default'
-                                : 'bg-gray-50 border-gray-100 text-gray-400 cursor-default'
-                              : isSelected
-                                ? 'bg-gray-900 border-gray-900 text-white'
-                                : 'bg-gray-50 border-gray-100 text-gray-700 hover:border-gray-300'
-                          }`}
-                        >
-                          <span className="font-medium truncate">{opt.label}</span>
-                          <span className="text-xs ml-2 flex-shrink-0 opacity-70 flex items-center gap-1">
-                            {resolved && isCorrect ? '✅ ' : ''}{(pool[opt.id] ?? 0).toLocaleString()}
-                            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[9px] leading-none">P</span>
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  {q.status === 'pending' && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => rejectPending(q.id)}
-                        className="flex-1 py-2.5 flex items-center justify-center gap-2 border border-red-200 text-red-500 hover:bg-red-50 text-sm font-semibold rounded-xl transition-colors"
-                      >
-                        <ThumbsDown size={14} /> ปฏิเสธ
-                      </button>
-                      <button
-                        onClick={() => approvePending(q.id)}
-                        className="flex-1 py-2.5 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-colors"
-                      >
-                        <ThumbsUp size={14} /> อนุมัติ
-                      </button>
-                    </div>
-                  )}
-
-                  {q.status !== 'resolved' && q.status !== 'pending' && (
-                    <div className="flex gap-2">
-                      {q.status === 'open' && (
-                        <button
-                          onClick={() => closeQuestion(q.id)}
-                          className="px-4 py-2.5 flex items-center justify-center gap-1.5 border border-amber-300 text-amber-600 hover:bg-amber-50 text-sm font-semibold rounded-xl transition-colors flex-shrink-0"
-                        >
-                          <Clock size={14} /> ปิดรับ
-                        </button>
-                      )}
-                      <button
-                        onClick={() => resolve(q.id)}
-                        disabled={!selected[q.id] || resolving === q.id}
-                        className="flex-1 py-2.5 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl transition-colors"
-                      >
-                        <CheckCircle2 size={15} />
-                        {resolving === q.id
-                          ? 'กำลังเฉลย...'
-                          : selected[q.id]
-                            ? `เฉลย — "${options.find(o => o.id === selected[q.id])?.label}"`
-                            : 'เลือกคำตอบที่ถูกก่อน'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          })}
+      {/* Resolve Modal */}
+      {resolveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <div>
+              <h2 className="font-bold text-gray-900 text-base">เฉลยคำถาม</h2>
+              <p className="text-sm text-gray-500 mt-1 leading-snug">{resolveModal.title}</p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">เลือกคำตอบที่ถูกต้อง</p>
+              {(resolveModal.options as { id: string; label: string }[]).map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => setResolveOption(opt.id)}
+                  className={`w-full text-left px-4 py-3 rounded-xl border text-sm font-medium transition-all ${
+                    resolveOption === opt.id
+                      ? 'bg-gray-900 border-gray-900 text-white'
+                      : 'bg-gray-50 border-gray-100 text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => { setResolveModal(null); setResolveOption('') }}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500 hover:bg-gray-50 transition-colors"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={resolve}
+                disabled={!resolveOption || resolving}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl transition-colors"
+              >
+                {resolving ? 'กำลังเฉลย...' : 'ยืนยันเฉลย'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

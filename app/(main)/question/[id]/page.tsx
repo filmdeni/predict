@@ -8,9 +8,11 @@ import CommentSection from '@/components/question/CommentSection'
 import type { Database } from '@/lib/supabase/types'
 import { getOdds, getPoolShares } from '@/lib/game/odds'
 import { ArrowLeft, Share2, Link2, Check } from 'lucide-react'
+import ProbabilityChart from '@/components/question/ProbabilityChart'
 
 type Question = Database['public']['Tables']['questions']['Row'] & {
   categories: { name_th: string; emoji: string }
+  creator?: { display_name: string; username: string } | null
 }
 
 function timeLeft(closesAt: string): string {
@@ -22,6 +24,19 @@ function timeLeft(closesAt: string): string {
   if (days > 0) return `${days} วัน ${hours} ชม.`
   if (hours > 0) return `${hours} ชม. ${mins} นาที`
   return `${mins} นาที`
+}
+
+function closesLabel(closesAt: string): string {
+  const diff = new Date(closesAt).getTime() - Date.now()
+  if (diff <= 0) return 'หมดเวลาแล้ว'
+  const days = Math.floor(diff / 86400000)
+  const date = new Date(closesAt)
+  const dateStr = `${date.getDate()} ${['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][date.getMonth()]} ${date.getFullYear() + 543}`
+  if (days > 0) return `จบในอีก ${days} วัน (${dateStr})`
+  const hours = Math.floor((diff % 86400000) / 3600000)
+  const mins = Math.floor((diff % 3600000) / 60000)
+  if (hours > 0) return `จบในอีก ${hours} ชม. ${mins} นาที (${dateStr})`
+  return `จบในอีก ${mins} นาที`
 }
 
 function urgencyLevel(closesAt: string): 'normal' | 'soon' | 'critical' {
@@ -59,7 +74,7 @@ export default function QuestionPage() {
   useEffect(() => {
     async function load() {
       const [{ data }, { data: { user } }] = await Promise.all([
-        supabase.from('questions').select('*, categories(name_th, emoji)').eq('id', id).single(),
+        supabase.from('questions').select('*, categories(name_th, emoji), creator:created_by(display_name, username)').eq('id', id).single(),
         supabase.auth.getUser(),
       ])
       setQuestion(data as unknown as Question)
@@ -122,7 +137,8 @@ export default function QuestionPage() {
   }
 
   const isOpen = question.status === 'open' && new Date(question.closes_at) > new Date()
-  const options = question.options as { id: string; label: string }[]
+  const isLive = isOpen && (new Date(question.closes_at).getTime() - Date.now()) < 30 * 86400000
+  const options = question.options as { id: string; label: string; icon_url?: string | null }[]
   const shares = getPoolShares(question.pool)
 
   return (
@@ -167,30 +183,52 @@ export default function QuestionPage() {
       </div>
 
       {/* question card */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4 shadow-sm">
-        <div className="flex items-center justify-between">
+      <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+        {/* header: category + time */}
+        <div className="flex items-center justify-between px-4 pt-4 pb-2">
           <span className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 font-medium">
             {question.categories.emoji} {question.categories.name_th}
           </span>
-          {isOpen && (
-            <span className="text-xs text-green-600 font-medium flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block" />
-              เหลือ {timeLeft(question.closes_at)}
-            </span>
+          <span className="text-xs text-gray-500 flex items-center gap-1">
+            {isOpen ? (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block" />
+                {closesLabel(question.closes_at)}
+              </>
+            ) : (
+              <span>หมดเวลาแล้ว</span>
+            )}
+          </span>
+        </div>
+
+        {/* body: text + image */}
+        <div className="flex gap-3 px-4 pb-3">
+          <div className="flex-1 min-w-0 space-y-2">
+            <h1 className="text-gray-900 font-bold text-lg leading-snug">{question.title}</h1>
+            {question.description && (
+              <p className="text-gray-500 text-sm leading-relaxed line-clamp-3">{question.description}</p>
+            )}
+            {/* creator */}
+            {question.creator && (
+              <div className="flex items-center gap-1.5 pt-1">
+                <div className="w-5 h-5 rounded-full bg-indigo-500 flex items-center justify-center text-[10px] text-white font-bold">
+                  {question.creator.display_name?.[0]?.toUpperCase() ?? 'M'}
+                </div>
+                <span className="text-xs text-gray-400">สร้างโดย <span className="text-gray-600 font-medium">{question.creator.display_name || question.creator.username}</span></span>
+              </div>
+            )}
+          </div>
+          {question.image_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={question.image_url} alt="" className="w-32 h-36 rounded-xl object-cover flex-shrink-0" />
           )}
         </div>
 
-        <h1 className="text-gray-900 font-bold text-lg leading-snug">{question.title}</h1>
-
-        {question.description && (
-          <p className="text-gray-500 text-sm leading-relaxed">{question.description}</p>
-        )}
-
         {/* pool bar */}
-        <div className="space-y-2">
-          <div className="flex h-2.5 rounded-full overflow-hidden gap-0.5">
+        <div className="px-4 pb-4 space-y-2">
+          <div className="flex h-2 rounded-full overflow-hidden gap-0.5">
             {options.map((opt, i) => {
-              const colors = ['bg-green-400', 'bg-red-400', 'bg-blue-400', 'bg-orange-400']
+              const colors = ['bg-green-400', 'bg-blue-400', 'bg-orange-400', 'bg-purple-400']
               return (
                 <div
                   key={opt.id}
@@ -200,31 +238,50 @@ export default function QuestionPage() {
               )
             })}
           </div>
-          <div className="flex justify-between flex-wrap gap-2">
+          <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
+            {isLive && (
+              <span className="flex items-center gap-1 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full leading-none">
+                <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
+                สด
+              </span>
+            )}
             {options.map((opt, i) => {
-              const colors = ['bg-green-400', 'bg-red-400', 'bg-blue-400', 'bg-orange-400']
+              const dotColors = ['bg-green-400', 'bg-blue-400', 'bg-orange-400', 'bg-purple-400']
               return (
-                <div key={opt.id} className="flex items-center gap-1.5">
-                  <span className={`inline-block w-2 h-2 rounded-full ${colors[i % colors.length]}`} />
+                <div key={opt.id} className="flex items-center gap-1">
+                  {opt.icon_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={opt.icon_url} alt="" className="w-3 h-3 rounded object-cover flex-shrink-0" />
+                  ) : (
+                    <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${dotColors[i % dotColors.length]}`} />
+                  )}
                   <span className="text-xs text-gray-500">{opt.label}</span>
                   <span className="text-xs font-bold text-gray-900">{(shares[opt.id] ?? 0).toFixed(0)}%</span>
                 </div>
               )
             })}
-            <span className="text-xs text-gray-400 ml-auto flex items-center gap-1">
-                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[9px] leading-none flex-shrink-0">P</span>
-                คะแนนรวม {question.total_pool.toLocaleString()}
-              </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 text-xs text-gray-400 pt-1 border-t border-gray-100">
+        {/* stats row */}
+        <div className="flex items-center gap-3 px-4 pb-4 border-t border-gray-100 pt-3 text-xs text-gray-400">
           <span>👥 {question.predictions_count} คนทาย</span>
           <span className="flex items-center gap-1">
-            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[9px] leading-none flex-shrink-0">P</span>
+            <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[8px] leading-none flex-shrink-0">P</span>
             คะแนนรวม {question.total_pool.toLocaleString()}
           </span>
         </div>
+
+        {/* Probability trend chart */}
+        {options.length > 3 && (
+          <div className="px-4 pb-4">
+            <ProbabilityChart
+              questionId={id}
+              options={options}
+              currentPool={question.pool as Record<string, number>}
+            />
+          </div>
+        )}
       </div>
 
       {/* My existing prediction */}
@@ -292,7 +349,13 @@ export default function QuestionPage() {
                     : 'bg-white border-gray-200 text-gray-700 hover:border-gray-400'
                 }`}
               >
-                <span className="font-semibold">{opt.label}</span>
+                <div className="flex items-center gap-2.5">
+                  {opt.icon_url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={opt.icon_url} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+                  )}
+                  <span className="font-semibold">{opt.label}</span>
+                </div>
                 <span className={`text-sm font-medium ${selected ? 'text-gray-300' : 'text-gray-400'}`}>
                   {odds > 0 ? `${odds.toFixed(2)}x` : `${(100 / options.length).toFixed(0)}%`}
                 </span>

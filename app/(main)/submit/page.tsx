@@ -4,8 +4,11 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Trash2 } from 'lucide-react'
+import CardStylePicker, { type CardStyle } from '@/components/question/CardStylePicker'
+import OptionIconUpload from '@/components/question/OptionIconUpload'
+import ImageUpload from '@/components/question/ImageUpload'
 
-interface Option { id: string; label: string }
+interface Option { id: string; label: string; icon_url?: string | null }
 
 export default function SubmitQuestionPage() {
   const router = useRouter()
@@ -20,6 +23,8 @@ export default function SubmitQuestionPage() {
     { id: 'no', label: 'ไม่ใช่' },
   ])
   const [closesAt, setClosesAt] = useState('')
+  const [cardStyle, setCardStyle] = useState<CardStyle>('auto')
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
@@ -55,6 +60,10 @@ export default function SubmitQuestionPage() {
     setOptions(o => o.map(x => x.id === id ? { ...x, label } : x))
   }
 
+  function updateOptionIcon(id: string, icon_url: string | null) {
+    setOptions(o => o.map(x => x.id === id ? { ...x, icon_url } : x))
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!categoryId || options.length < 2 || options.some(o => !o.label.trim())) {
@@ -79,6 +88,8 @@ export default function SubmitQuestionPage() {
       total_pool: 0,
       closes_at: new Date(closesAt).toISOString(),
       status: 'pending',
+      card_style: cardStyle,
+      image_url: imageUrl,
     } as never)
 
     if (err) { setError(err.message); setLoading(false); return }
@@ -157,13 +168,20 @@ export default function SubmitQuestionPage() {
           />
         </div>
 
+        {/* Image upload */}
+        <div>
+          <label className="text-sm font-medium text-gray-700 block mb-1.5">รูปประกอบ <span className="text-gray-400 font-normal">(ไม่บังคับ)</span></label>
+          <ImageUpload imageUrl={imageUrl} onChange={setImageUrl} />
+        </div>
+
         {/* Options */}
         <div>
           <label className="text-sm font-medium text-gray-700 block mb-1.5">ตัวเลือก</label>
           <div className="space-y-2">
             {options.map((opt, i) => (
-              <div key={opt.id} className="flex gap-2">
-                <span className="flex items-center justify-center w-8 h-10 text-xs text-gray-400 font-medium">{i + 1}</span>
+              <div key={opt.id} className="flex gap-2 items-center">
+                <span className="flex items-center justify-center w-6 text-xs text-gray-400 font-medium flex-shrink-0">{i + 1}</span>
+                <OptionIconUpload iconUrl={opt.icon_url ?? null} onChange={url => updateOptionIcon(opt.id, url)} />
                 <input
                   required
                   placeholder={`ตัวเลือกที่ ${i + 1}`}
@@ -172,7 +190,7 @@ export default function SubmitQuestionPage() {
                   className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-gray-400"
                 />
                 {options.length > 2 && (
-                  <button type="button" onClick={() => removeOption(opt.id)} className="p-2 text-gray-300 hover:text-red-400 transition-colors">
+                  <button type="button" onClick={() => removeOption(opt.id)} className="p-2 text-gray-300 hover:text-red-400 transition-colors flex-shrink-0">
                     <Trash2 size={16} />
                   </button>
                 )}
@@ -189,6 +207,9 @@ export default function SubmitQuestionPage() {
             </button>
           )}
         </div>
+
+        {/* Card style */}
+        <CardStylePicker value={cardStyle} onChange={setCardStyle} />
 
         {/* Closes at */}
         <div>
