@@ -182,7 +182,7 @@ export default function QuestionPageClient() {
                 if (!popup.closed) return
                 clearInterval(poll)
                 const elapsed = Date.now() - openedAt
-                if (elapsed < 15000) {
+                if (elapsed < 5000) {
                   // closed too fast — user cancelled
                   setShareStatus('idle')
                   return

@@ -45,7 +45,17 @@ interface QuestionStatusNotif {
   createdAt: string
 }
 
-type Notif = PredictionNotif | ReplyNotif | ReferralNotif | QuestionStatusNotif
+interface ShareNotif {
+  kind: 'share'
+  id: string
+  message: string
+  coinsWon: number
+  questionId: string
+  read: boolean
+  createdAt: string
+}
+
+type Notif = PredictionNotif | ReplyNotif | ReferralNotif | QuestionStatusNotif | ShareNotif
 
 export default function NotificationBell() {
   const supabase = createClient()
@@ -136,9 +146,9 @@ export default function NotificationBell() {
         .limit(10),
       supabase
         .from('notifications')
-        .select('id, type, read, created_at, message, coins_gained, question_id, comment_id, comments(body, question_id, users(display_name))')
+        .select('id, type, read, created_at, message, coins_gained, coins_won, question_id, comment_id, comments(body, question_id, users(display_name))')
         .eq('user_id', userId)
-        .in('type', ['reply', 'referral', 'question_approved', 'question_rejected'])
+        .in('type', ['reply', 'referral', 'question_approved', 'question_rejected', 'share'])
         .order('created_at', { ascending: false })
         .limit(20),
     ])
@@ -153,7 +163,7 @@ export default function NotificationBell() {
       resolvedAt: p.resolved_at,
     }))
 
-    const dbNotifs: (ReplyNotif | ReferralNotif | QuestionStatusNotif)[] = (replyRes.data ?? []).map((n: any) => {
+    const dbNotifs: (ReplyNotif | ReferralNotif | QuestionStatusNotif | ShareNotif)[] = (replyRes.data ?? []).map((n: any) => {
       if (n.type === 'referral') {
         return {
           kind: 'referral' as const,
@@ -170,6 +180,17 @@ export default function NotificationBell() {
           kind: n.type as 'question_approved' | 'question_rejected',
           id: n.id,
           message: n.message ?? '',
+          questionId: n.question_id ?? '',
+          read: n.read,
+          createdAt: n.created_at,
+        }
+      }
+      if (n.type === 'share') {
+        return {
+          kind: 'share' as const,
+          id: n.id,
+          message: n.message ?? 'แชร์คำถามสำเร็จ!',
+          coinsWon: n.coins_won ?? 500,
           questionId: n.question_id ?? '',
           read: n.read,
           createdAt: n.created_at,
@@ -264,6 +285,15 @@ export default function NotificationBell() {
                           <span className="text-lg mt-0.5">{n.kind === 'question_approved' ? '🎉' : '❌'}</span>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs text-gray-900 font-medium">{n.message}</p>
+                          </div>
+                          {!n.read && <span className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0 mt-1" />}
+                        </>
+                      ) : n.kind === 'share' ? (
+                        <>
+                          <span className="text-lg mt-0.5">📤</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-gray-900 font-medium">{n.message}</p>
+                            <p className="text-xs text-amber-600 font-semibold mt-0.5">+{n.coinsWon.toLocaleString()} คะแนน</p>
                           </div>
                           {!n.read && <span className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0 mt-1" />}
                         </>

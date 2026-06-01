@@ -229,6 +229,7 @@ export default function FeedPage() {
   const [tickKey, setTickKey] = useState(0)
   const [mainGridOrdered, setMainGridOrdered] = useState<Question[]>([])
   const [trendingDropOver, setTrendingDropOver] = useState(false)
+  const [now, setNow] = useState(() => new Date())
   const supabase = createClient()
 
   const pinToTrending = useCallback(async (q: Question) => {
@@ -433,13 +434,17 @@ export default function FeedPage() {
     return () => { supabase.removeChannel(channel) }
   }, [category])
 
-  const now = new Date()
   const active = questions.filter(q => q.status !== 'resolved' && !(q.status === 'open' && new Date(q.closes_at) <= now))
   const expired = questions.filter(q => q.status === 'open' && new Date(q.closes_at) <= now)
   const resolved = questions.filter(q => q.status === 'resolved')
   const hotIds = new Set(trending.map(t => t.id))
   const hotCounts: Record<string, number> = {}
   trending.forEach(t => { hotCounts[t.id] = t.recent_count })
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(id)
+  }, [])
 
   // Sync ordered grid when questions/filter changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
