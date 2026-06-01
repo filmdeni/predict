@@ -28,7 +28,7 @@ export default function InvitePage() {
       if (!user) { router.push('/login'); return }
       setUserId(user.id)
 
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from('notifications')
         .select('id, message, coins_gained, created_at, ref_user:ref_user_id(display_name)')
         .eq('user_id', user.id)
@@ -36,7 +36,7 @@ export default function InvitePage() {
         .order('created_at', { ascending: false })
         .limit(20)
 
-      setReferrals((data ?? []) as ReferralNotif[])
+      setReferrals((data ?? []) as unknown as ReferralNotif[])
       setLoading(false)
     }
     load()

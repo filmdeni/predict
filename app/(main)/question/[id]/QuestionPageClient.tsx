@@ -6,7 +6,9 @@ import { createClient } from '@/lib/supabase/client'
 import PlacePredictionModal from '@/components/prediction/PlacePredictionModal'
 import CommentSection from '@/components/question/CommentSection'
 import type { Database } from '@/lib/supabase/types'
+import type { User } from '@supabase/supabase-js'
 import { getOdds, getPoolShares } from '@/lib/game/odds'
+import { urgencyLevel } from '@/lib/game/time'
 import { ArrowLeft, Share2, Link2, Check } from 'lucide-react'
 import ProbabilityChart from '@/components/question/ProbabilityChart'
 
@@ -39,12 +41,6 @@ function closesLabel(closesAt: string): string {
   return `จบในอีก ${mins} นาที`
 }
 
-function urgencyLevel(closesAt: string): 'normal' | 'soon' | 'critical' {
-  const diff = new Date(closesAt).getTime() - Date.now()
-  if (diff <= 1800000) return 'critical'   // < 30 min
-  if (diff <= 7200000) return 'soon'        // < 2 hr
-  return 'normal'
-}
 
 export default function QuestionPageClient() {
   const { id } = useParams<{ id: string }>()
@@ -57,7 +53,7 @@ export default function QuestionPageClient() {
   const [selectedOption, setSelectedOption] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [success, setSuccess] = useState(false)
-  const [user, setUser] = useState<import('@supabase/supabase-js').User | null>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [trendingOption, setTrendingOption] = useState<{ id: string; label: string; delta: number } | null>(null)
   const [myPrediction, setMyPrediction] = useState<{ option_id: string; coins_wagered: number; is_correct: boolean | null; coins_won: number | null } | null>(null)
   const supabase = createClient()

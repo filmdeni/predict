@@ -244,7 +244,7 @@ export default function FeedPage() {
   const pinToTrending = useCallback(async (q: Question) => {
     if (trending.some(t => t.id === q.id)) return
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).from('questions').update({ is_pinned_trending: true, is_daily_hero: false }).eq('id', q.id)
+    await supabase.from('questions').update({ is_pinned_trending: true, is_daily_hero: false }).eq('id', q.id)
     if (pinnedHeroId === q.id) setPinnedHeroId(null)
     setTrending(prev => [{ ...q, recent_count: q.predictions_count, is_pinned_trending: true }, ...prev].slice(0, 4))
   }, [supabase, trending])
@@ -253,13 +253,13 @@ export default function FeedPage() {
     setTrending(ordered)
     for (let i = 0; i < ordered.length; i++) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from('questions').update({ trending_sort_order: i }).eq('id', ordered[i].id)
+      await supabase.from('questions').update({ trending_sort_order: i }).eq('id', ordered[i].id)
     }
   }, [supabase])
 
   const unpinFromTrending = useCallback(async (id: string) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).from('questions').update({ is_pinned_trending: false }).eq('id', id)
+    await supabase.from('questions').update({ is_pinned_trending: false }).eq('id', id)
     setTrending(prev => {
       const unpinned = prev.find(t => t.id === id)
       return prev.filter(t => t.id !== id)
@@ -268,16 +268,16 @@ export default function FeedPage() {
 
   const pinToHero = useCallback(async (q: Question) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).from('questions').update({ is_daily_hero: false }).neq('id', q.id)
+    await supabase.from('questions').update({ is_daily_hero: false }).neq('id', q.id)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).from('questions').update({ is_daily_hero: true, is_pinned_trending: false }).eq('id', q.id)
+    await supabase.from('questions').update({ is_daily_hero: true, is_pinned_trending: false }).eq('id', q.id)
     setTrending(prev => prev.filter(x => x.id !== q.id))
     setPinnedHeroId(q.id)
   }, [supabase])
 
   const unpinHero = useCallback(async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).from('questions').update({ is_daily_hero: false }).eq('is_daily_hero', true)
+    await supabase.from('questions').update({ is_daily_hero: false }).eq('is_daily_hero', true)
     setQuestions(prev => prev.map(x => ({ ...x, is_daily_hero: false })))
     setTrending(prev => prev.map(x => ({ ...x, is_daily_hero: false })))
     setPinnedHeroId(null)
@@ -288,7 +288,7 @@ export default function FeedPage() {
     const updates = ordered.map((q, i) => ({ id: q.id, sort_order: i }))
     for (const u of updates) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from('questions').update({ sort_order: u.sort_order }).eq('id', u.id)
+      await supabase.from('questions').update({ sort_order: u.sort_order }).eq('id', u.id)
     }
   }, [supabase])
 
@@ -297,7 +297,7 @@ export default function FeedPage() {
       if (!user) return
       setIsAdmin(user.email === ADMIN_EMAIL)
       const [{ data: savedData }, { data: predData }] = await Promise.all([
-        (supabase as any).from('saved_questions').select('question_id').eq('user_id', user.id),
+        supabase.from('saved_questions').select('question_id').eq('user_id', user.id),
         supabase.from('predictions').select('question_id').eq('user_id', user.id),
       ])
       setSavedIds(new Set((savedData ?? []).map((r: { question_id: string }) => r.question_id)))
@@ -347,8 +347,7 @@ export default function FeedPage() {
   useEffect(() => {
     async function loadTrending() {
       // pinned first
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: pinned } = await (supabase as any)
+      const { data: pinned } = await supabase
         .from('questions')
         .select('*, categories(name_th, emoji, slug)')
         .eq('is_pinned_trending', true)

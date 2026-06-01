@@ -45,14 +45,14 @@ export default function ResolvedRewardPopup() {
 
             setReward({
               predictionId: n.id,
-              questionTitle: (qRes.data as any)?.title ?? n.message ?? '—',
+              questionTitle: qRes.data?.title ?? n.message ?? '—',
               questionId: n.question_id,
-              imageUrl: (qRes.data as any)?.image_url ?? null,
+              imageUrl: qRes.data?.image_url ?? null,
               isCorrect: n.is_correct,
               coinsWon: n.coins_won ?? 0,
               repDelta: n.rep_delta ?? 0,
-              winStreak: (uRes.data as any)?.win_streak ?? 0,
-              reputation: (uRes.data as any)?.reputation ?? 0,
+              winStreak: uRes.data?.win_streak ?? 0,
+              reputation: uRes.data?.reputation ?? 0,
             })
           }
         )
@@ -281,7 +281,7 @@ export default function ResolvedRewardPopup() {
                 disabled={flying}
                 className="w-full py-3.5 bg-gray-900 text-white font-bold rounded-2xl hover:bg-gray-700 transition-all text-sm tracking-wide disabled:opacity-70"
               >
-                รับรางวัล
+                รับคะแนน
               </button>
             </div>
           </div>

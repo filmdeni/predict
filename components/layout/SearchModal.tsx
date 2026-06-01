@@ -15,23 +15,32 @@ export default function SearchModal({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Question[]>([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const resultsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     inputRef.current?.focus()
   }, [])
 
   useEffect(() => {
-    if (!query.trim()) { setResults([]); return }
+    if (!query.trim()) { setResults([]); setError(false); return }
     const timer = setTimeout(async () => {
       setLoading(true)
-      const { data } = await supabase
+      setError(false)
+      const { data, error: qErr } = await supabase
         .from('questions')
         .select('*, categories(name_th, emoji)')
         .ilike('title', `%${query}%`)
         .eq('status', 'open')
         .limit(8)
-      setResults((data ?? []) as Question[])
+      if (qErr) {
+        setError(true)
+        setResults([])
+      } else {
+        setResults((data ?? []) as Question[])
+        resultsRef.current?.scrollTo({ top: 0 })
+      }
       setLoading(false)
     }, 300)
     return () => clearTimeout(timer)
@@ -58,11 +67,13 @@ export default function SearchModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* results */}
-        <div className="max-h-96 overflow-y-auto">
+        <div ref={resultsRef} className="max-h-96 overflow-y-auto">
           {loading ? (
             <div className="space-y-2 p-3">
               {[1,2,3].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}
             </div>
+          ) : error ? (
+            <p className="text-sm text-red-400 text-center py-8">เกิดข้อผิดพลาด ลองใหม่อีกครั้ง</p>
           ) : results.length > 0 ? (
             results.map(q => (
               <Link key={q.id} href={`/question/${q.id}`} onClick={onClose}>

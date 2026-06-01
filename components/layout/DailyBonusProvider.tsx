@@ -19,7 +19,7 @@ export default function DailyBonusProvider() {
       if (!user) return
 
       // Daily bonus
-      const { data: bonus } = await (supabase as any).rpc('daily_login_bonus', { p_user_id: user.id })
+      const { data: bonus } = await supabase.rpc('daily_login_bonus', { p_user_id: user.id })
       if (bonus && bonus > 0) {
         setToast({ type: 'daily', message: `+${bonus} P`, sub: 'โบนัส login รายวัน' })
         setTimeout(() => setToast(null), 3500)

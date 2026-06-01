@@ -62,7 +62,7 @@ export default function ProfilePage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      await (supabase.from('users') as any).upsert({
+      await supabase.from('users').upsert({
         id: user.id,
         username: (user.email?.split('@')[0] ?? 'user') + '_' + user.id.slice(0, 4),
         display_name: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'ผู้ใช้',
@@ -77,12 +77,12 @@ export default function ProfilePage() {
           .eq('user_id', user.id)
           .order('placed_at', { ascending: false })
           .limit(20),
-        (supabase as any)
+        supabase
           .from('saved_questions')
           .select('question_id, questions(*, categories(name_th, emoji, slug))')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false }),
-        (supabase as any)
+        supabase
           .from('user_badges')
           .select('badge_id, earned_at, badges(id, name_th, description_th, emoji, category)')
           .eq('user_id', user.id)
@@ -126,7 +126,7 @@ export default function ProfilePage() {
     setSaving(true)
     setEditError(null)
     const bio = editBio.trim() || null
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('users')
       .update({ display_name: name, username: uname, bio })
       .eq('id', profile.id)

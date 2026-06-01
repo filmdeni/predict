@@ -6,6 +6,7 @@ import { Bookmark, Trash2, Pencil, Clock, MoreVertical, CheckCircle2, XCircle, L
 import { useState, useTransition, useRef, useEffect } from 'react'
 import { toast } from '@/components/ui/Toast'
 import { getPoolShares } from '@/lib/game/odds'
+import { urgencyLevel } from '@/lib/game/time'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
 
@@ -82,12 +83,6 @@ function ArcGauge({ pct }: { pct: number }) {
   )
 }
 
-function urgencyLevel(closesAt: string): 'normal' | 'soon' | 'critical' {
-  const diff = new Date(closesAt).getTime() - Date.now()
-  if (diff <= 1800000) return 'critical'
-  if (diff <= 7200000) return 'soon'
-  return 'normal'
-}
 
 interface Props {
   question: Question
@@ -103,8 +98,7 @@ export default function QuestionCard({ question, initialSaved = false, isPredict
   const router = useRouter()
   const shares = getPoolShares(question.pool)
   const options = question.options as { id: string; label: string; icon_url?: string | null }[]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const cardStyle = (question as any).card_style ?? 'auto'
+  const cardStyle = question.card_style ?? 'auto'
   const isRows = cardStyle === 'rows'
   const isBinary = !isRows && (cardStyle === 'gauge' || (cardStyle === 'auto' && options.length === 2))
   const topPct = shares[options[0]?.id ?? ''] ?? 0
@@ -148,8 +142,7 @@ export default function QuestionCard({ question, initialSaved = false, isPredict
     e.stopPropagation()
     setMenuOpen(false)
     const supabase = createClient()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any).from('questions').update({ status }).eq('id', question.id)
+    const { error } = await supabase.from('questions').update({ status: status as 'pending' | 'open' | 'closed' | 'resolved' | 'cancelled' }).eq('id', question.id)
     if (error) toast('เปลี่ยนสถานะไม่ได้: ' + error.message)
     else toast(`เปลี่ยนเป็น "${status}" แล้ว ✓`)
   }
@@ -170,8 +163,7 @@ export default function QuestionCard({ question, initialSaved = false, isPredict
       } else {
         await supabase
           .from('saved_questions')
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .insert({ user_id: user.id, question_id: question.id } as any)
+          .insert({ user_id: user.id, question_id: question.id })
       }
       const next = !saved
       setSaved(next)

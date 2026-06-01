@@ -81,7 +81,7 @@ export default function NotificationBell() {
             const notif: PredictionNotif = {
               kind: 'prediction',
               id: payload.new.id,
-              questionTitle: (q as any)?.title ?? '—',
+              questionTitle: (q as { title: string } | null)?.title ?? '—',
               questionId: payload.new.question_id,
               isCorrect: payload.new.is_correct,
               coinsWon: payload.new.coins_won ?? 0,
@@ -115,7 +115,8 @@ export default function NotificationBell() {
               .eq('id', n.comment_id)
               .single()
             if (!comment) return
-            const c = comment as any
+            type CommentRow = { body: string; question_id: string; users: { display_name: string } | null }
+            const c = comment as CommentRow
             const notif: ReplyNotif = {
               kind: 'reply',
               id: n.id,
@@ -153,7 +154,8 @@ export default function NotificationBell() {
         .limit(20),
     ])
 
-    const predictions: PredictionNotif[] = (predRes.data ?? []).map((p: any) => ({
+    type PredRow = { id: string; question_id: string; is_correct: boolean; coins_won: number | null; resolved_at: string; questions: { title: string } | null }
+    const predictions: PredictionNotif[] = ((predRes.data ?? []) as unknown as PredRow[]).map((p) => ({
       kind: 'prediction',
       id: p.id,
       questionTitle: p.questions?.title ?? '—',
@@ -163,7 +165,8 @@ export default function NotificationBell() {
       resolvedAt: p.resolved_at,
     }))
 
-    const dbNotifs: (ReplyNotif | ReferralNotif | QuestionStatusNotif | ShareNotif)[] = (replyRes.data ?? []).map((n: any) => {
+    type NotifRow = { id: string; type: string; read: boolean; created_at: string; message: string | null; coins_gained: number | null; coins_won: number | null; question_id: string | null; comment_id: string | null; comments: { body: string; question_id: string; users: { display_name: string } | null } | null }
+    const dbNotifs: (ReplyNotif | ReferralNotif | QuestionStatusNotif | ShareNotif)[] = ((replyRes.data ?? []) as unknown as NotifRow[]).map((n) => {
       if (n.type === 'referral') {
         return {
           kind: 'referral' as const,
@@ -226,8 +229,7 @@ export default function NotificationBell() {
   async function markRepliesRead() {
     if (!user) return
     localStorage.setItem('notif_last_seen', new Date().toISOString())
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false)
+    await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false)
     setUnread(0)
   }
 

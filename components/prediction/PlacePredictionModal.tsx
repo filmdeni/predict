@@ -70,13 +70,12 @@ export default function PlacePredictionModal({ question, optionId, onClose, onSu
       const refKey = `ref:${question.id}`
       const referredBy = localStorage.getItem(refKey)
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: rpcError } = await (supabase as any).rpc('place_prediction', {
+      const { error: rpcError } = await supabase.rpc('place_prediction', {
         p_question_id: question.id,
         p_user_id: user.id,
         p_option_id: optionId,
         p_coins: coins,
-        p_referred_by: referredBy ?? null,
+        p_referred_by: referredBy ?? undefined,
       })
 
       if (!rpcError) localStorage.removeItem(refKey)
@@ -179,7 +178,7 @@ export default function PlacePredictionModal({ question, optionId, onClose, onSu
               ~+{(payout - coins).toLocaleString()} คะแนน ({gainPct > 0 ? '+' : ''}{gainPct}%)
             </span>
           </div>
-          <p className="text-xs text-gray-400 pt-1 border-t border-green-100">รางวัลจริงขึ้นอยู่กับจำนวนผู้ร่วมทายทั้งหมด</p>
+          <p className="text-xs text-gray-400 pt-1 border-t border-green-100">คะแนนที่ได้รับขึ้นอยู่กับจำนวนผู้ร่วมทายทั้งหมด</p>
         </div>
 
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}

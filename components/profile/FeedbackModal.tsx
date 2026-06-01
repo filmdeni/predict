@@ -8,7 +8,7 @@ const CATEGORIES = [
   { value: 'bug', label: '🐛 เจอบัค / ใช้งานไม่ได้' },
   { value: 'ui', label: '🎨 หน้าตาแอป' },
   { value: 'predict', label: '🔮 ระบบทาย' },
-  { value: 'coins', label: '💰 คะแนน / รางวัล' },
+  { value: 'coins', label: '💰 คะแนน / ระบบคะแนน' },
   { value: 'suggestion', label: '💡 ข้อเสนอแนะ' },
   { value: 'other', label: '📝 อื่นๆ' },
 ]

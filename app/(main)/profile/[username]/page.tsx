@@ -32,7 +32,7 @@ export default function PublicProfilePage() {
       .then(async ({ data }) => {
         if (!data) { setNotFound(true); setLoading(false); return }
         setProfile(data as unknown as UserProfile)
-        const { data: userBadges } = await (supabase as any)
+        const { data: userBadges } = await supabase
           .from('user_badges')
           .select('badge_id, earned_at, badges(id, name_th, description_th, emoji, category)')
           .eq('user_id', (data as unknown as UserProfile).id)

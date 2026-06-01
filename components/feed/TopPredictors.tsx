@@ -45,6 +45,7 @@ const MOCK_USERS: TopUser[] = [
 export default function TopPredictors({ category }: { category: string }) {
   const [users, setUsers] = useState<TopUser[]>([])
   const [catUsers, setCatUsers] = useState<CategoryUser[]>([])
+  const [catLoading, setCatLoading] = useState(false)
   const [tab, setTab] = useState<'coins' | 'accuracy'>('coins')
   const [showInfo, setShowInfo] = useState(false)
   const supabase = createClient()
@@ -60,9 +61,10 @@ export default function TopPredictors({ category }: { category: string }) {
   }, [tab, category])
 
   useEffect(() => {
-    if (category === 'all') return
+    if (category === 'all') { setCatLoading(false); return }
 
     async function loadCategory() {
+      setCatLoading(true)
       const { data: cat } = await supabase
         .from('categories')
         .select('id')
@@ -81,8 +83,9 @@ export default function TopPredictors({ category }: { category: string }) {
         return
       }
 
+      type PredRow = { user_id: string; is_correct: boolean | null; coins_won: number | null }
       const agg: Record<string, { total: number; correct: number; coins_won: number }> = {}
-      for (const p of preds as any[]) {
+      for (const p of preds as unknown as PredRow[]) {
         if (!agg[p.user_id]) agg[p.user_id] = { total: 0, correct: 0, coins_won: 0 }
         agg[p.user_id].total++
         if (p.is_correct) agg[p.user_id].correct++
@@ -95,7 +98,8 @@ export default function TopPredictors({ category }: { category: string }) {
         .select('id, username, display_name, avatar_url, rank, coins')
         .in('id', userIds)
 
-      const result: CategoryUser[] = (userRows as any[] ?? []).map(u => ({
+      type UserRow = { id: string; username: string; display_name: string; avatar_url: string | null; rank: string; coins: number }
+      const result: CategoryUser[] = ((userRows ?? []) as unknown as UserRow[]).map(u => ({
         user_id: u.id,
         display_name: u.display_name,
         username: u.username,
@@ -111,6 +115,7 @@ export default function TopPredictors({ category }: { category: string }) {
       )
 
       setCatUsers(result.slice(0, 5))
+      setCatLoading(false)
     }
 
     loadCategory()
@@ -155,7 +160,7 @@ export default function TopPredictors({ category }: { category: string }) {
             </div>
 
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">ระดับแรงก์ & วงเงินทาย</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">ระดับแรงก์ & ขีดจำกัดการทาย</p>
               <div className="space-y-1.5">
                 {RANKS.map(r => (
                   <div key={r.tier} className="flex items-center justify-between">
@@ -206,7 +211,20 @@ export default function TopPredictors({ category }: { category: string }) {
 
       {/* List */}
       <div className="divide-y divide-gray-50">
-        {displayUsers.map((user, i) => {
+        {catLoading ? (
+          <div className="space-y-1 p-3">
+            {[1,2,3].map(i => (
+              <div key={i} className="flex items-center gap-3 px-1 py-2">
+                <div className="w-6 h-6 bg-gray-100 rounded-full animate-pulse" />
+                <div className="w-8 h-8 bg-gray-100 rounded-full animate-pulse" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 bg-gray-100 rounded animate-pulse w-2/3" />
+                  <div className="h-2.5 bg-gray-100 rounded animate-pulse w-1/3" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : displayUsers.map((user, i) => {
           const total = isAll ? (user as TopUser).total_predictions : (user as CategoryUser).total
           const correct = isAll ? (user as TopUser).correct_predictions : (user as CategoryUser).correct
           const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0
