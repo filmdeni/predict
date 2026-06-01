@@ -242,6 +242,24 @@ export type Database = {
           },
         ]
       }
+      category_visibility: {
+        Row: {
+          slug: string
+          hidden: boolean
+          updated_at: string
+        }
+        Insert: {
+          slug: string
+          hidden?: boolean
+          updated_at?: string
+        }
+        Update: {
+          slug?: string
+          hidden?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pool_snapshots: {
         Row: {
           id: number

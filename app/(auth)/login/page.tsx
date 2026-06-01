@@ -28,7 +28,16 @@ function LoginForm() {
     else setSent(true)
   }
 
+  function isInAppBrowser() {
+    const ua = navigator.userAgent
+    return /FBAN|FBAV|Instagram|Line|Twitter|Messenger|MicroMessenger|WebView|wv/.test(ua)
+  }
+
   async function handleGoogle() {
+    if (isInAppBrowser()) {
+      setError('กรุณาเปิดลิงก์นี้ใน Safari หรือ Chrome เพื่อเข้าสู่ระบบด้วย Google')
+      return
+    }
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${location.origin}/auth/callback?next=${next}` },
@@ -118,6 +127,11 @@ function LoginForm() {
 
             {/* ── Auth card ── */}
             <div className="fade-up delay-4 rounded-2xl border border-white/[0.07] bg-white/[0.03] backdrop-blur-sm p-5 space-y-4">
+              {error && !email && (
+                <p className="text-amber-400/90 text-xs text-center leading-relaxed bg-amber-400/[0.06] border border-amber-400/20 rounded-xl px-3 py-2.5">
+                  {error}
+                </p>
+              )}
               <button
                 onClick={handleGoogle}
                 className="w-full flex items-center justify-center gap-3 py-3 bg-white text-gray-900 font-medium rounded-xl hover:bg-gray-50 active:scale-[0.98] transition-all text-sm"

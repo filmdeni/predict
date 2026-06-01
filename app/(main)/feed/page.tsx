@@ -380,6 +380,14 @@ export default function FeedPage() {
   useEffect(() => {
     async function load() {
       setLoading(true)
+
+      // fetch hidden category slugs
+      const { data: visData } = await supabase
+        .from('category_visibility')
+        .select('slug')
+        .eq('hidden', true)
+      const hiddenSlugs = (visData ?? []).map(r => r.slug)
+
       let query = supabase
         .from('questions')
         .select('*, categories(name_th, emoji, slug)')
@@ -396,6 +404,17 @@ export default function FeedPage() {
           .in('slug', slugs)
         const ids = (cats ?? []).map((c: { id: number }) => c.id)
         query = query.in('category_id', ids.length > 0 ? ids : [-1])
+      } else if (hiddenSlugs.length > 0) {
+        // exclude hidden categories when showing all
+        const allHiddenSlugs = hiddenSlugs.flatMap(s => [s, ...(PARENT_SUBS[s] ?? [])])
+        const { data: hiddenCats } = await supabase
+          .from('categories')
+          .select('id')
+          .in('slug', allHiddenSlugs)
+        const hiddenIds = (hiddenCats ?? []).map((c: { id: number }) => c.id)
+        if (hiddenIds.length > 0) {
+          query = query.not('category_id', 'in', `(${hiddenIds.join(',')})`)
+        }
       }
 
       const { data } = await query

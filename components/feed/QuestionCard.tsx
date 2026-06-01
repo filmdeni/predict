@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Gift, Bookmark, Trash2, Pencil, Clock, MoreVertical, CheckCircle2, XCircle, Lock } from 'lucide-react'
+import { Bookmark, Trash2, Pencil, Clock, MoreVertical, CheckCircle2, XCircle, Lock } from 'lucide-react'
 import { useState, useTransition, useRef, useEffect } from 'react'
 import { toast } from '@/components/ui/Toast'
 import { getPoolShares } from '@/lib/game/odds'
@@ -406,10 +406,7 @@ export default function QuestionCard({ question, initialSaved = false, isPredict
             )}
           </div>
           <div className="flex items-center gap-1.5 text-gray-300 flex-shrink-0 ml-2">
-            <button className="hover:text-gray-500 transition-colors" onClick={e => e.preventDefault()}>
-              <Gift size={13} />
-            </button>
-            <button
+<button
               onClick={toggleSave}
               disabled={pending}
               className={`transition-colors ${saved ? 'text-indigo-500 hover:text-indigo-700' : 'hover:text-gray-500'}`}

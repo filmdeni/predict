@@ -1,13 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
 export const PARENT_SUBS: Record<string, string[]> = {
   esports: ['esports', 'dota2', 'apex', 'cs2', 'rov'],
   sports:  ['sports', 'football', 'boxing', 'nba'],
 }
 
-const GROUPS = [
+const ALL_GROUPS = [
   { slug: 'all',      name: 'ทั้งหมด',  subs: [] },
   { slug: 'politics', name: 'การเมือง', subs: [] },
   { slug: 'crypto',   name: 'Crypto',   subs: [] },
@@ -37,7 +38,7 @@ const GROUPS = [
 
 // ย้อนหา parent จาก sub-slug
 const SUB_TO_PARENT: Record<string, string> = {}
-for (const g of GROUPS) {
+for (const g of ALL_GROUPS) {
   for (const s of g.subs) SUB_TO_PARENT[s.slug] = g.slug
 }
 
@@ -47,6 +48,21 @@ interface Props {
 }
 
 export default function CategoryFilter({ selected, onChange }: Props) {
+  const [hiddenSlugs, setHiddenSlugs] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('category_visibility')
+      .select('slug, hidden')
+      .eq('hidden', true)
+      .then(({ data }) => {
+        if (data) setHiddenSlugs(new Set(data.map(r => r.slug)))
+      })
+  }, [])
+
+  const GROUPS = ALL_GROUPS.filter(g => !hiddenSlugs.has(g.slug))
+
   const activeParent = SUB_TO_PARENT[selected] ?? selected
   const activeGroup = GROUPS.find(g => g.slug === activeParent)
   const hasSubs = (activeGroup?.subs.length ?? 0) > 0
@@ -75,7 +91,7 @@ export default function CategoryFilter({ selected, onChange }: Props) {
             >
               {g.name}
               {g.subs.length > 0 && (
-                <span className={`text-[10px] ${isActive ? 'text-gray-400' : 'text-gray-400'}`}>▾</span>
+                <span className="text-[10px] text-gray-400">▾</span>
               )}
             </button>
           )

@@ -87,7 +87,7 @@ export default function Header() {
         {user ? (
           <div className="flex items-center gap-2 ml-1">
             {coins !== null && (
-              <Link href="/profile/me" className="flex items-center gap-1.5 bg-gray-100 rounded-full px-3 py-1.5 hover:bg-gray-200 transition-colors">
+              <Link id="header-coins" href="/profile/me" className="flex items-center gap-1.5 bg-gray-100 rounded-full px-3 py-1.5 hover:bg-gray-200 transition-colors">
                 <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[9px] leading-none flex-shrink-0">P</span>
                 <span className="text-sm font-semibold text-gray-800 tabular-nums">{coins.toLocaleString()}</span>
               </Link>
