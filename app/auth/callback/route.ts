@@ -6,9 +6,10 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/feed'
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
   const forwardedHost = request.headers.get('x-forwarded-host')
-  const base = siteUrl ?? (forwardedHost ? `https://${forwardedHost}` : origin)
+  const base = process.env.NODE_ENV === 'production'
+    ? (process.env.NEXT_PUBLIC_SITE_URL ?? (forwardedHost ? `https://${forwardedHost}` : origin))
+    : origin
 
   if (code) {
     const response = NextResponse.redirect(`${base}${next}`)
