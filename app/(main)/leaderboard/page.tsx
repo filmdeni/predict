@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
-import { Trophy, Flame } from 'lucide-react'
+import { Trophy, Flame, RefreshCw } from 'lucide-react'
 import { RANKS } from '@/lib/game/ranks'
 
 type UserProfile = Database['public']['Tables']['users']['Row']
@@ -17,45 +17,73 @@ const MEDAL = ['🥇', '🥈', '🥉']
 export default function LeaderboardPage() {
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [tab, setTab] = useState<'reputation' | 'winrate' | 'streak'>('reputation')
   const supabase = createClient()
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true)
-      if (tab === 'winrate') {
-        // sort client-side by true win rate (min 5 predictions)
-        const { data } = await supabase
-          .from('users')
-          .select('*')
-          .gte('total_predictions', 5)
-          .order('correct_predictions', { ascending: false })
-          .limit(200)
-        const sorted = ((data ?? []) as UserProfile[]).sort((a, b) => {
-          const ra = a.total_predictions > 0 ? a.correct_predictions / a.total_predictions : 0
-          const rb = b.total_predictions > 0 ? b.correct_predictions / b.total_predictions : 0
-          return rb - ra
-        }).slice(0, 20)
-        setUsers(sorted)
-      } else {
-        const orderCol = tab === 'reputation' ? 'reputation' : 'win_streak'
-        const { data } = await supabase
-          .from('users')
-          .select('*')
-          .order(orderCol, { ascending: false })
-          .limit(20)
-        setUsers(data ?? [])
-      }
-      setLoading(false)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
+    else setRefreshing(true)
+    if (tab === 'winrate') {
+      const { data } = await supabase
+        .from('users')
+        .select('*')
+        .gte('total_predictions', 5)
+        .order('correct_predictions', { ascending: false })
+        .limit(200)
+      const sorted = ((data ?? []) as UserProfile[]).sort((a, b) => {
+        const ra = a.total_predictions > 0 ? a.correct_predictions / a.total_predictions : 0
+        const rb = b.total_predictions > 0 ? b.correct_predictions / b.total_predictions : 0
+        return rb - ra
+      }).slice(0, 20)
+      setUsers(sorted)
+    } else {
+      const orderCol = tab === 'reputation' ? 'reputation' : 'win_streak'
+      const { data } = await supabase
+        .from('users')
+        .select('*')
+        .order(orderCol, { ascending: false })
+        .limit(20)
+      setUsers(data ?? [])
     }
-    load()
+    setLoading(false)
+    setRefreshing(false)
   }, [tab])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  // Refetch when window regains focus
+  useEffect(() => {
+    const onFocus = () => load(true)
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [load])
+
+  // Realtime subscription — re-sort whenever any user's rep/streak changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('leaderboard-users')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users' }, () => {
+        load(true)
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [load])
 
   return (
     <div className="max-w-lg mx-auto p-6 space-y-5">
       <div className="flex items-center gap-2">
         <Trophy size={20} className="text-yellow-500" />
         <h1 className="text-xl font-bold text-gray-900">อันดับ</h1>
+        <button
+          onClick={() => load(true)}
+          disabled={refreshing}
+          className="ml-auto p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        >
+          <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
+        </button>
       </div>
 
       {/* Tabs */}
