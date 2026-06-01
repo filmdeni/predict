@@ -505,7 +505,7 @@ export default function FeedPage() {
         ) : (
           <>
             {/* ── Hero Banner ── */}
-            {false && heroQuestion && (
+            {heroQuestion && (
               <section className="animate-fadeInUp">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
@@ -516,96 +516,17 @@ export default function FeedPage() {
                     + เสนอคำถาม
                   </Link>
                 </div>
-                {(() => {
-                  const heroDaysLeft = Math.floor((new Date(heroQuestion.closes_at).getTime() - Date.now()) / 86400000)
-                  const heroIsLive = heroQuestion.status === 'open' && new Date(heroQuestion.closes_at) > new Date() && heroDaysLeft < 30
-                  return (
-                <Link href={`/question/${heroQuestion.id}`} className="block">
-                  <article className="relative bg-white border border-indigo-100 rounded-2xl overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
-                    {heroIsLive && (
-                      <div className="absolute top-2 left-2 z-20 flex items-center gap-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none pointer-events-none">
-                        <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
-                        สด
-                      </div>
-                    )}
-                    {/* banner with gradient overlay */}
-                    {heroQuestion.image_url ? (
-                      <div className="relative h-36">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={heroQuestion.image_url ?? undefined} alt="" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                        <div className="absolute bottom-0 left-0 right-0 p-3">
-                          <span className="text-[10px] font-semibold text-white/70 uppercase tracking-widest">{heroQuestion.categories.emoji} {heroQuestion.categories.name_th}</span>
-                          <h3 className="text-sm font-bold text-white leading-snug line-clamp-2 mt-0.5">
-                            {heroQuestion.title}
-                          </h3>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-4 pb-0 flex gap-3 items-start">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-2xl flex-shrink-0">
-                          {heroQuestion.categories.emoji}
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-semibold text-indigo-500 uppercase tracking-widest">{heroQuestion.categories.name_th}</span>
-                          <h3 className="text-sm font-bold text-gray-900 leading-snug mt-0.5">{heroQuestion.title}</h3>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* options */}
-                    <div className="px-4 pt-3 pb-1 space-y-1.5">
-                      {(heroQuestion.options as { id: string; label: string; icon_url?: string | null }[]).slice(0, 4).map((opt, i) => {
-                        const shares = getPoolShares(heroQuestion.pool)
-                        const pct = shares[opt.id] ?? 0
-                        const colors = ['bg-indigo-500', 'bg-amber-400', 'bg-emerald-500', 'bg-purple-400']
-                        return (
-                          <div key={opt.id}>
-                            <div className="flex items-center justify-between text-xs mb-1 gap-2">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                {opt.icon_url && (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={opt.icon_url} alt="" className="w-6 h-6 rounded object-cover flex-shrink-0" />
-                                )}
-                                <span className="text-gray-700 font-medium truncate">{opt.label}</span>
-                              </div>
-                              <span className="font-bold text-gray-900 flex-shrink-0">{pct.toFixed(0)}%</span>
-                            </div>
-                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                              <div className={`h-full ${colors[i % colors.length]} rounded-full transition-all duration-700`} style={{ width: `${pct}%` }} />
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-
-                    {/* footer */}
-                    <div className="flex items-center justify-between px-4 py-3 mt-1 border-t border-gray-100">
-                      <div className="flex items-center gap-3 text-xs text-gray-400">
-                        <span className="flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                          {(() => {
-                            const diff = new Date(heroQuestion.closes_at).getTime() - Date.now()
-                            if (diff <= 0) return 'หมดเวลา'
-                            const days = Math.floor(diff / 86400000)
-                            const hours = Math.floor((diff % 86400000) / 3600000)
-                            return days > 0 ? `${days} วัน` : `${hours} ชม.`
-                          })()}
-                        </span>
-                        <span>👥 {heroQuestion.predictions_count.toLocaleString()}</span>
-                        <span className="flex items-center gap-1">
-                          <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[8px] leading-none">P</span>
-                          {heroQuestion.total_pool >= 1000 ? `${(heroQuestion.total_pool / 1000).toFixed(0)}K` : heroQuestion.total_pool}
-                        </span>
-                      </div>
-                      <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-full">
-                        ทายเลย →
-                      </span>
-                    </div>
-                  </article>
-                </Link>
-                  )
-                })()}
+                <div className="max-w-sm">
+                  <QuestionCard
+                    question={heroQuestion}
+                    isAdmin={isAdmin}
+                    isHot={hotIds.has(heroQuestion.id)}
+                    recentCount={hotCounts[heroQuestion.id]}
+                    initialSaved={savedIds.has(heroQuestion.id)}
+                    isPredicted={predictedIds.has(heroQuestion.id)}
+                    onDelete={id => setQuestions(prev => prev.filter(x => x.id !== id))}
+                  />
+                </div>
               </section>
             )}
 
@@ -642,6 +563,9 @@ export default function FeedPage() {
                       ⠿ ลาก-วางเพื่อเรียงลำดับ
                     </span>
                   )}
+                  <Link href="/submit" className="ml-auto flex items-center gap-1 px-3 py-1.5 rounded-full bg-gray-900 text-white text-xs font-semibold hover:bg-gray-700 transition-colors">
+                    + เสนอคำถาม
+                  </Link>
                 </div>
                 <DraggableGrid
                   items={mainGridOrdered.length > 0 ? mainGridOrdered : mainGrid}
