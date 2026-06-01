@@ -445,6 +445,7 @@ export type Database = {
           description: string | null
           id: string
           image_url: string | null
+          is_daily_hero: boolean
           is_pinned_trending: boolean
           options: Json
           pool: Record<string, number>
@@ -470,6 +471,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_daily_hero?: boolean
           is_pinned_trending?: boolean
           options?: Json
           pool?: Json
@@ -495,6 +497,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_daily_hero?: boolean
           is_pinned_trending?: boolean
           options?: Json
           pool?: Json

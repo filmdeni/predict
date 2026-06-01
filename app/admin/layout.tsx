@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { LayoutDashboard, HelpCircle, Users, ChevronRight, ArrowLeftRight, Tag } from 'lucide-react'
+import { LayoutDashboard, HelpCircle, Users, ChevronRight, ArrowLeftRight, Tag, MessageSquareWarning } from 'lucide-react'
 
 const ADMIN_EMAIL = 'zwwzww19192@gmail.com'
 
@@ -13,6 +13,7 @@ const NAV = [
   { href: '/admin/questions', label: 'คำถาม', icon: HelpCircle, exact: false },
   { href: '/admin/users', label: 'ผู้ใช้', icon: Users, exact: false },
   { href: '/admin/categories', label: 'หมวดหมู่', icon: Tag, exact: false },
+  { href: '/admin/feedback', label: 'Feedback', icon: MessageSquareWarning, exact: false },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

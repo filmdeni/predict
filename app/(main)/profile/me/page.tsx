@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
-import { LogOut, Trophy, Target, Flame, BookOpen, Bookmark, Pencil, Check, X } from 'lucide-react'
+import { LogOut, Trophy, Target, Flame, BookOpen, Bookmark, Pencil, Check, X, MessageSquareWarning } from 'lucide-react'
+import FeedbackModal from '@/components/profile/FeedbackModal'
 import { getRank, getNextRank, getProgressToNext } from '@/lib/game/ranks'
 import QuestionCard from '@/components/feed/QuestionCard'
 
@@ -52,6 +53,7 @@ export default function ProfilePage() {
   const [editBio, setEditBio] = useState('')
   const [saving, setSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+  const [showFeedback, setShowFeedback] = useState(false)
 
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null
@@ -325,6 +327,22 @@ export default function ProfilePage() {
         <span className="flex-1 text-sm font-medium text-gray-700">วิธีเล่น ภาวนา</span>
         <span className="text-gray-400 text-xs">→</span>
       </Link>
+
+      {/* Report / Feedback */}
+      <button
+        onClick={() => setShowFeedback(true)}
+        className="w-full flex items-center gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-3.5 shadow-sm hover:border-gray-300 transition-colors text-left"
+      >
+        <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center">
+          <MessageSquareWarning size={16} className="text-red-500" />
+        </div>
+        <span className="flex-1 text-sm font-medium text-gray-700">แจ้งปัญหา / ข้อเสนอแนะ</span>
+        <span className="text-gray-400 text-xs">→</span>
+      </button>
+
+      {showFeedback && profile && (
+        <FeedbackModal userId={profile.id} onClose={() => setShowFeedback(false)} />
+      )}
 
       {/* Tabs */}
       <div>

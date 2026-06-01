@@ -29,6 +29,7 @@ function DraggableGrid({
   predictedIds,
   hotIds,
   hotCounts,
+  pinnedHeroId,
   onDelete,
   onReorder,
   onDragStart,
@@ -39,6 +40,7 @@ function DraggableGrid({
   predictedIds: Set<string>
   hotIds: Set<string>
   hotCounts: Record<string, number>
+  pinnedHeroId?: string | null
   onDelete: (id: string) => void
   onReorder: (ordered: Question[]) => void
   onDragStart?: (q: Question) => void
@@ -65,7 +67,7 @@ function DraggableGrid({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
       {items.map((q, i) => (
         <div
           key={q.id}
@@ -75,13 +77,18 @@ function DraggableGrid({
           onDragEnd={handleDragEnd}
           onDragOver={e => e.preventDefault()}
           className={[
-            'animate-fadeInUp transition-all',
+            'animate-fadeInUp transition-all relative',
             isAdmin ? 'cursor-grab active:cursor-grabbing' : '',
             overIndex === i && dragIndex.current !== i ? 'ring-2 ring-indigo-400 rounded-xl scale-[1.02]' : '',
             dragIndex.current === i ? 'opacity-40' : '',
           ].join(' ')}
           style={{ animationDelay: `${i * 40}ms` }}
         >
+          {pinnedHeroId && q.id === pinnedHeroId && (
+            <div className="absolute -top-2 left-3 z-10">
+              <span className="text-[10px] text-yellow-700 bg-yellow-100 border border-yellow-300 px-2 py-0.5 rounded-full font-medium">🌟 คำถามประจำวัน</span>
+            </div>
+          )}
           <QuestionCard
             question={q}
             isAdmin={isAdmin}
@@ -229,15 +236,17 @@ export default function FeedPage() {
   const [tickKey, setTickKey] = useState(0)
   const [mainGridOrdered, setMainGridOrdered] = useState<Question[]>([])
   const [trendingDropOver, setTrendingDropOver] = useState(false)
+  const [heroDropOver, setHeroDropOver] = useState(false)
+  const [pinnedHeroId, setPinnedHeroId] = useState<string | null>(null)
   const [now, setNow] = useState(() => new Date())
   const supabase = createClient()
 
   const pinToTrending = useCallback(async (q: Question) => {
     if (trending.some(t => t.id === q.id)) return
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).from('questions').update({ is_pinned_trending: true }).eq('id', q.id)
+    await (supabase as any).from('questions').update({ is_pinned_trending: true, is_daily_hero: false }).eq('id', q.id)
+    if (pinnedHeroId === q.id) setPinnedHeroId(null)
     setTrending(prev => [{ ...q, recent_count: q.predictions_count, is_pinned_trending: true }, ...prev].slice(0, 4))
-    setQuestions(prev => prev.filter(x => x.id !== q.id))
   }, [supabase, trending])
 
   const saveTrendingOrder = useCallback(async (ordered: TrendingQuestion[]) => {
@@ -253,9 +262,25 @@ export default function FeedPage() {
     await (supabase as any).from('questions').update({ is_pinned_trending: false }).eq('id', id)
     setTrending(prev => {
       const unpinned = prev.find(t => t.id === id)
-      if (unpinned) setQuestions(qs => [unpinned, ...qs.filter(x => x.id !== id)])
       return prev.filter(t => t.id !== id)
     })
+  }, [supabase])
+
+  const pinToHero = useCallback(async (q: Question) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from('questions').update({ is_daily_hero: false }).neq('id', q.id)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from('questions').update({ is_daily_hero: true, is_pinned_trending: false }).eq('id', q.id)
+    setTrending(prev => prev.filter(x => x.id !== q.id))
+    setPinnedHeroId(q.id)
+  }, [supabase])
+
+  const unpinHero = useCallback(async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from('questions').update({ is_daily_hero: false }).eq('is_daily_hero', true)
+    setQuestions(prev => prev.map(x => ({ ...x, is_daily_hero: false })))
+    setTrending(prev => prev.map(x => ({ ...x, is_daily_hero: false })))
+    setPinnedHeroId(null)
   }, [supabase])
 
   const saveOrder = useCallback(async (ordered: Question[]) => {
@@ -329,7 +354,9 @@ export default function FeedPage() {
         .eq('is_pinned_trending', true)
         .eq('status', 'open')
         .order('trending_sort_order', { ascending: true, nullsFirst: false })
-      const pinnedList: TrendingQuestion[] = ((pinned ?? []) as Question[]).map(q => ({ ...q, recent_count: q.predictions_count }))
+      const pinnedList: TrendingQuestion[] = ((pinned ?? []) as Question[])
+        .filter((q: Question & { is_daily_hero?: boolean }) => !q.is_daily_hero)
+        .map(q => ({ ...q, recent_count: q.predictions_count }))
       const pinnedIds = new Set(pinnedList.map(q => q.id))
 
       const since24h = new Date(Date.now() - 86400000).toISOString()
@@ -354,6 +381,7 @@ export default function FeedPage() {
             .from('questions')
             .select('*, categories(name_th, emoji, slug)')
             .in('id', topIds)
+            .eq('is_daily_hero', false)
           if (qs) {
             const auto = (qs as Question[]).map(q => ({ ...q, recent_count: counts[q.id] ?? 0 })).sort((a, b) => b.recent_count - a.recent_count)
             setTrending([...pinnedList, ...auto])
@@ -369,6 +397,7 @@ export default function FeedPage() {
         .from('questions')
         .select('*, categories(name_th, emoji, slug)')
         .eq('status', 'open')
+        .eq('is_daily_hero', false)
         .order('predictions_count', { ascending: false })
         .limit(4)
       if (fallback) {
@@ -419,7 +448,10 @@ export default function FeedPage() {
       }
 
       const { data } = await query
-      setQuestions((data as Question[]) ?? [])
+      const qs = (data as Question[]) ?? []
+      setQuestions(qs)
+      const pinned = qs.find(q => (q as Question & { is_daily_hero?: boolean }).is_daily_hero)
+      if (pinned) setPinnedHeroId(pinned.id)
       setLoading(false)
     }
     load()
@@ -437,7 +469,7 @@ export default function FeedPage() {
   const active = questions.filter(q => q.status !== 'resolved' && !(q.status === 'open' && new Date(q.closes_at) <= now))
   const expired = questions.filter(q => q.status === 'open' && new Date(q.closes_at) <= now)
   const resolved = questions.filter(q => q.status === 'resolved')
-  const hotIds = new Set(trending.map(t => t.id))
+  const hotIds = new Set(trending.filter(t => t.id !== pinnedHeroId).map(t => t.id))
   const hotCounts: Record<string, number> = {}
   trending.forEach(t => { hotCounts[t.id] = t.recent_count })
 
@@ -450,11 +482,13 @@ export default function FeedPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { setMainGridOrdered([]) }, [category, loading])
 
-  // Hero = active question with most predictions_count (not in trending to avoid dupe)
+  // Hero = pinned (is_daily_hero) if set, else auto-select most popular non-trending
+  const pinnedHero = pinnedHeroId ? active.find(q => q.id === pinnedHeroId) ?? null : null
   const heroCandidates = active.filter(q => !hotIds.has(q.id))
-  const heroQuestion = heroCandidates.length > 0
+  const autoHero = heroCandidates.length > 0
     ? heroCandidates.reduce((a, b) => b.predictions_count > a.predictions_count ? b : a)
     : active[0] ?? null
+  const heroQuestion = pinnedHero ?? autoHero
   const heroId = heroQuestion?.id
 
   // Main grid = active minus hero; exclude trending only when trending section is visible (all category)
@@ -504,26 +538,6 @@ export default function FeedPage() {
           </div>
         ) : (
           <>
-            {/* ── Hero Banner ── */}
-            {heroQuestion && (
-              <section className="animate-fadeInUp">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-base">🌟</span>
-                  <h2 className="text-sm font-bold text-gray-900">คำถามประจำวัน</h2>
-                </div>
-                <div className="max-w-sm">
-                  <QuestionCard
-                    question={heroQuestion}
-                    isAdmin={isAdmin}
-                    isHot={hotIds.has(heroQuestion.id)}
-                    recentCount={hotCounts[heroQuestion.id]}
-                    initialSaved={savedIds.has(heroQuestion.id)}
-                    isPredicted={predictedIds.has(heroQuestion.id)}
-                    onDelete={id => setQuestions(prev => prev.filter(x => x.id !== id))}
-                  />
-                </div>
-              </section>
-            )}
 
             {/* ── 🔥 มาแรงตอนนี้ ── */}
             {(trending.length > 0 || isAdmin) && category === 'all' && (
@@ -546,29 +560,49 @@ export default function FeedPage() {
               />
             )}
 
-            {/* ── 👥 คนกำลังทาย ── */}
-            {mainGrid.length > 0 && (
-              <section>
+            {/* ── 👥 คนกำลังทาย (+ daily hero) ── */}
+            {(heroQuestion || mainGrid.length > 0) && (
+              <section
+                onDragOver={isAdmin ? e => { e.preventDefault(); setHeroDropOver(true) } : undefined}
+                onDragLeave={isAdmin ? () => setHeroDropOver(false) : undefined}
+                onDrop={isAdmin ? e => {
+                  e.preventDefault(); setHeroDropOver(false)
+                  const q = draggedQuestionRef.current
+                  if (q) { draggedQuestionRef.current = null; pinToHero(q) }
+                } : undefined}
+              >
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-base">👥</span>
                   <h2 className="text-sm font-bold text-gray-900">คนกำลังทาย</h2>
-                  <span className="text-[11px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{mainGrid.length} คำถาม</span>
+                  <span className="text-[11px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{active.length} คำถาม</span>
+                  {isAdmin && pinnedHeroId && (
+                    <button onClick={unpinHero} className="text-[10px] text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full hover:bg-indigo-100 transition-colors">
+                      📌 unpin คำถามประจำวัน
+                    </button>
+                  )}
                   {isAdmin && (
-                    <span className="text-[10px] text-indigo-400 bg-indigo-50 px-2 py-0.5 rounded-full">
-                      ⠿ ลาก-วางเพื่อเรียงลำดับ
+                    <span className={[
+                      'text-[10px] px-2 py-0.5 rounded-full transition-colors',
+                      heroDropOver ? 'text-yellow-600 bg-yellow-100' : 'text-indigo-400 bg-indigo-50',
+                    ].join(' ')}>
+                      {heroDropOver ? '↓ ตั้งเป็นคำถามประจำวัน' : '⠿ ลากการ์ดมาวางเพื่อตั้งเป็นคำถามประจำวัน'}
                     </span>
                   )}
-
                 </div>
+
                 <DraggableGrid
-                  items={mainGridOrdered.length > 0 ? mainGridOrdered : mainGrid}
+                  items={(() => {
+                    const base = (mainGridOrdered.length > 0 ? mainGridOrdered : mainGrid).filter(q => q.id !== heroId)
+                    return heroQuestion ? [heroQuestion, ...base] : base
+                  })()}
                   isAdmin={isAdmin}
                   savedIds={savedIds}
                   predictedIds={predictedIds}
                   hotIds={hotIds}
                   hotCounts={hotCounts}
+                  pinnedHeroId={pinnedHeroId}
                   onDelete={id => setQuestions(prev => prev.filter(x => x.id !== id))}
-                  onReorder={saveOrder}
+                  onReorder={ordered => saveOrder(ordered.filter(q => q.id !== heroId))}
                   onDragStart={q => { draggedQuestionRef.current = q }}
                 />
               </section>
