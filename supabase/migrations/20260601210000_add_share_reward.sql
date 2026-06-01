@@ -8,6 +8,8 @@ create table if not exists question_shares (
 );
 
 alter table question_shares enable row level security;
+drop policy if exists "users can insert own shares" on question_shares;
+drop policy if exists "users can read own shares" on question_shares;
 create policy "users can insert own shares" on question_shares
   for insert with check (auth.uid() = user_id);
 create policy "users can read own shares" on question_shares

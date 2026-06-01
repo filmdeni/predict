@@ -33,24 +33,24 @@ export default function ResolvedRewardPopup() {
         .channel(`reward-popup:${userId}:${Date.now()}`)
         .on(
           'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'predictions', filter: `user_id=eq.${userId}` },
+          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
           async (payload) => {
-            const pred = payload.new
-            if (pred.is_correct === null || pred.is_correct === undefined) return
+            const n = payload.new
+            if (n.type !== 'prediction_resolved') return
 
             const [qRes, uRes] = await Promise.all([
-              supabase.from('questions').select('title, image_url').eq('id', pred.question_id).single(),
+              supabase.from('questions').select('title, image_url').eq('id', n.question_id).single(),
               supabase.from('users').select('win_streak, reputation').eq('id', userId!).single(),
             ])
 
             setReward({
-              predictionId: pred.id,
-              questionTitle: (qRes.data as any)?.title ?? '—',
-              questionId: pred.question_id,
+              predictionId: n.id,
+              questionTitle: (qRes.data as any)?.title ?? n.message ?? '—',
+              questionId: n.question_id,
               imageUrl: (qRes.data as any)?.image_url ?? null,
-              isCorrect: pred.is_correct,
-              coinsWon: pred.coins_won ?? 0,
-              repDelta: pred.rep_delta ?? 0,
+              isCorrect: n.is_correct,
+              coinsWon: n.coins_won ?? 0,
+              repDelta: n.rep_delta ?? 0,
               winStreak: (uRes.data as any)?.win_streak ?? 0,
               reputation: (uRes.data as any)?.reputation ?? 0,
             })
