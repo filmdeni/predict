@@ -192,12 +192,19 @@ export default function NotificationBell() {
       return new Date(bDate).getTime() - new Date(aDate).getTime()
     })
 
+    const lastSeen = localStorage.getItem('notif_last_seen')
+    const lastSeenDate = lastSeen ? new Date(lastSeen) : new Date(0)
+
+    const unreadPredictions = predictions.filter(p => new Date(p.resolvedAt) > lastSeenDate).length
+    const unreadDbNotifs = dbNotifs.filter(r => !r.read).length
+
     setNotifs(all)
-    setUnread(dbNotifs.filter(r => !r.read).length)
+    setUnread(unreadPredictions + unreadDbNotifs)
   }
 
   async function markRepliesRead() {
     if (!user) return
+    localStorage.setItem('notif_last_seen', new Date().toISOString())
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase as any).from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false)
     setUnread(0)
