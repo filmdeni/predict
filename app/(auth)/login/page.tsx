@@ -35,6 +35,7 @@ function LoginForm() {
 
   async function handleGoogle() {
     if (isInAppBrowser()) {
+      const ua = navigator.userAgent
       setError('กรุณาเปิดลิงก์นี้ใน Safari หรือ Chrome เพื่อเข้าสู่ระบบด้วย Google')
       return
     }

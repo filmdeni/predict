@@ -1,5 +1,4 @@
 import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function GET(request: NextRequest) {
@@ -7,27 +6,31 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/feed'
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const base = siteUrl ?? (forwardedHost ? `https://${forwardedHost}` : origin)
+
   if (code) {
-    const cookieStore = await cookies()
+    const response = NextResponse.redirect(`${base}${next}`)
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          getAll() { return cookieStore.getAll() },
+          getAll() { return request.cookies.getAll() },
           setAll(cookiesToSet) {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              response.cookies.set(name, value, options)
             )
           },
         },
       }
     )
+
     const { error } = await supabase.auth.exchangeCodeForSession(code)
-    const base = process.env.NEXT_PUBLIC_SITE_URL ?? origin
-    if (!error) return NextResponse.redirect(`${base}${next}`)
+    if (!error) return response
   }
 
-  const base = process.env.NEXT_PUBLIC_SITE_URL ?? origin
   return NextResponse.redirect(`${base}/login?error=auth`)
 }
