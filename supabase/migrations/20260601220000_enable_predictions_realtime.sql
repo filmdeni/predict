@@ -1,3 +1,6 @@
 -- Enable realtime for predictions table so ResolvedRewardPopup receives UPDATE events
-alter publication supabase_realtime add table predictions;
+do $$ begin
+  alter publication supabase_realtime add table predictions;
+exception when others then null;
+end $$;
 alter table predictions replica identity full;
