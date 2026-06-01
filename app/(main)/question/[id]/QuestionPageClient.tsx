@@ -217,9 +217,17 @@ export default function QuestionPageClient() {
       <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
         {/* header: category + time */}
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
-          <span className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 font-medium">
-            {question.categories.emoji} {question.categories.name_th}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 font-medium">
+              {question.categories.emoji} {question.categories.name_th}
+            </span>
+            {isLive && (
+              <span className="flex items-center gap-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                สด
+              </span>
+            )}
+          </div>
           <span className="text-xs text-gray-500 flex items-center gap-1">
             {isOpen ? (
               <>
@@ -270,12 +278,6 @@ export default function QuestionPageClient() {
             })}
           </div>
           <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
-            {isLive && (
-              <span className="flex items-center gap-1 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full leading-none">
-                <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
-                สด
-              </span>
-            )}
             {options.map((opt, i) => {
               const dotColors = ['bg-green-400', 'bg-blue-400', 'bg-orange-400', 'bg-purple-400']
               return (

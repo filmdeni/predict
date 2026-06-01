@@ -20,7 +20,6 @@ export default function Header() {
 
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null
-
     let userId: string | null = null
 
     async function fetchCoins() {
@@ -81,7 +80,7 @@ export default function Header() {
           </Link>
         )}
         <button onClick={() => setShowSearch(true)} className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors">
-          <Search size={18} />
+          <Search size={20} />
         </button>
         <NotificationBell />
         {user ? (

@@ -194,16 +194,26 @@ export default function QuestionCard({ question, initialSaved = false, isPredict
   return (
     <Link href={`/question/${question.id}`}>
       <article className={`relative bg-white border rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer h-full flex flex-col gap-3 ${borderClass}`}>
-        {/* HOT badge */}
-        {isHot && !isAdmin && !isPredicted && (
-          <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-            🔥 HOT
-          </div>
+        {/* LIVE badge — top left */}
+        {isLive && (
+          <span className="absolute top-2.5 left-2.5 flex items-center gap-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none z-10">
+            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+            สด
+          </span>
         )}
-        {/* Predicted badge */}
-        {isPredicted && !isAdmin && (
-          <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-indigo-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-            🔮 ทายแล้ว
+        {/* Top-right badges (non-admin) */}
+        {!isAdmin && (
+          <div className="absolute top-2.5 right-2.5 flex items-center gap-1">
+            {isHot && !isPredicted && (
+              <span className="flex items-center gap-1 bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                🔥 HOT
+              </span>
+            )}
+            {isPredicted && (
+              <span className="flex items-center gap-1 bg-indigo-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                🔮 ทายแล้ว
+              </span>
+            )}
           </div>
         )}
         {/* admin actions */}
@@ -382,12 +392,6 @@ export default function QuestionCard({ question, initialSaved = false, isPredict
                 </span>
               ) : (
                 <span className="flex items-center gap-1.5 flex-shrink-0">
-                  {isLive && (
-                    <span className="flex items-center gap-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-                      <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
-                      สด
-                    </span>
-                  )}
                   <Countdown closesAt={question.closes_at} />
                 </span>
               )
