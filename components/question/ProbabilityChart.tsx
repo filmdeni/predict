@@ -64,10 +64,11 @@ export default function ProbabilityChart({
   options: Option[]
   currentPool: Record<string, number>
 }) {
-  const [data, setData] = useState<ChartPoint[]>([])
+  const [basePoints, setBasePoints] = useState<ChartPoint[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
+  // Load historical snapshots once
   useEffect(() => {
     async function load() {
       const { data: snaps } = await supabase
@@ -88,24 +89,26 @@ export default function ProbabilityChart({
         return point
       })
 
-      // Append current pool as the live final point
-      const currentShares = getPoolShares(currentPool)
-      const nowLabel = formatDate(new Date().toISOString())
-      const lastPoint: ChartPoint = { date: nowLabel }
-      for (const opt of options) {
-        lastPoint[opt.id] = Math.round(currentShares[opt.id] ?? 0)
-      }
-      // Only append if different date or no snapshots
-      const last = points[points.length - 1]
-      if (!last || last.date !== nowLabel || options.some(o => last[o.id] !== lastPoint[o.id])) {
-        points.push(lastPoint)
-      }
-
-      setData(points)
+      setBasePoints(points)
       setLoading(false)
     }
     load()
   }, [questionId])
+
+  // Recompute live tail whenever currentPool changes
+  const data = (() => {
+    const currentShares = getPoolShares(currentPool)
+    const nowLabel = formatDate(new Date().toISOString())
+    const livePoint: ChartPoint = { date: nowLabel }
+    for (const opt of options) {
+      livePoint[opt.id] = Math.round(currentShares[opt.id] ?? 0)
+    }
+    const last = basePoints[basePoints.length - 1]
+    if (!last || last.date !== nowLabel || options.some(o => last[o.id] !== livePoint[o.id])) {
+      return [...basePoints, livePoint]
+    }
+    return basePoints
+  })()
 
   if (loading) {
     return <div className="h-48 rounded-xl bg-gray-100 animate-pulse" />
