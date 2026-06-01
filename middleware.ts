@@ -6,6 +6,16 @@ const PROTECTED = ['/profile/me', '/api/resolve']
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
+  // Assign anonymous visitor ID on first visit
+  if (!request.cookies.get('anon_id')) {
+    supabaseResponse.cookies.set('anon_id', crypto.randomUUID(), {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: 'lax',
+      httpOnly: false,
+    })
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

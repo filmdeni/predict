@@ -68,6 +68,24 @@ export type Database = {
         }
         Relationships: []
       }
+      category_visibility: {
+        Row: {
+          hidden: boolean
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          hidden?: boolean
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          hidden?: boolean
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       coin_transactions: {
         Row: {
           amount: number
@@ -194,34 +212,43 @@ export type Database = {
       notifications: {
         Row: {
           actor_id: string | null
+          coins_won: number | null
           comment_id: string | null
           created_at: string | null
           id: string
+          is_correct: boolean | null
           message: string | null
           question_id: string | null
           read: boolean | null
+          rep_delta: number | null
           type: string
           user_id: string
         }
         Insert: {
           actor_id?: string | null
+          coins_won?: number | null
           comment_id?: string | null
           created_at?: string | null
           id?: string
+          is_correct?: boolean | null
           message?: string | null
           question_id?: string | null
           read?: boolean | null
+          rep_delta?: number | null
           type: string
           user_id: string
         }
         Update: {
           actor_id?: string | null
+          coins_won?: number | null
           comment_id?: string | null
           created_at?: string | null
           id?: string
+          is_correct?: boolean | null
           message?: string | null
           question_id?: string | null
           read?: boolean | null
+          rep_delta?: number | null
           type?: string
           user_id?: string
         }
@@ -242,34 +269,48 @@ export type Database = {
           },
         ]
       }
-      category_visibility: {
+      page_views: {
         Row: {
-          slug: string
-          hidden: boolean
-          updated_at: string
+          anon_id: string
+          id: string
+          path: string
+          session_id: string
+          viewed_at: string
         }
         Insert: {
-          slug: string
-          hidden?: boolean
-          updated_at?: string
+          anon_id: string
+          id?: string
+          path: string
+          session_id: string
+          viewed_at?: string
         }
         Update: {
-          slug?: string
-          hidden?: boolean
-          updated_at?: string
+          anon_id?: string
+          id?: string
+          path?: string
+          session_id?: string
+          viewed_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "page_views_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "visitor_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pool_snapshots: {
         Row: {
           id: number
-          pool: Json
+          pool: Record<string, number>
           question_id: string
           recorded_at: string
         }
         Insert: {
           id?: number
-          pool: Json
+          pool: Record<string, number>
           question_id: string
           recorded_at?: string
         }
@@ -356,6 +397,42 @@ export type Database = {
           },
         ]
       }
+      question_shares: {
+        Row: {
+          id: string
+          question_id: string
+          shared_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          question_id: string
+          shared_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          question_id?: string
+          shared_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_shares_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "question_shares_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       questions: {
         Row: {
           card_style: string
@@ -368,6 +445,7 @@ export type Database = {
           description: string | null
           id: string
           image_url: string | null
+          is_pinned_trending: boolean
           options: Json
           pool: Record<string, number>
           predictions_count: number
@@ -377,6 +455,7 @@ export type Database = {
           status: Database["public"]["Enums"]["question_status"]
           title: string
           total_pool: number
+          trending_sort_order: number | null
           updated_at: string
           views_count: number
         }
@@ -391,8 +470,9 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_pinned_trending?: boolean
           options?: Json
-          pool?: Record<string, number>
+          pool?: Json
           predictions_count?: number
           resolved_at?: string | null
           sort_order?: number | null
@@ -400,6 +480,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["question_status"]
           title: string
           total_pool?: number
+          trending_sort_order?: number | null
           updated_at?: string
           views_count?: number
         }
@@ -414,8 +495,9 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_pinned_trending?: boolean
           options?: Json
-          pool?: Record<string, number>
+          pool?: Json
           predictions_count?: number
           resolved_at?: string | null
           sort_order?: number | null
@@ -423,6 +505,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["question_status"]
           title?: string
           total_pool?: number
+          trending_sort_order?: number | null
           updated_at?: string
           views_count?: number
         }
@@ -575,11 +658,45 @@ export type Database = {
         }
         Relationships: []
       }
+      visitor_sessions: {
+        Row: {
+          anon_id: string
+          device_type: string | null
+          first_seen: string
+          id: string
+          last_seen: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          anon_id: string
+          device_type?: string | null
+          first_seen?: string
+          id?: string
+          last_seen?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          anon_id?: string
+          device_type?: string | null
+          first_seen?: string
+          id?: string
+          last_seen?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      admin_delete_question: {
+        Args: { p_question_id: string }
+        Returns: undefined
+      }
       award_badge: {
         Args: { p_badge_id: string; p_user_id: string }
         Returns: undefined
@@ -589,7 +706,6 @@ export type Database = {
         Returns: undefined
       }
       daily_login_bonus: { Args: { p_user_id: string }; Returns: number }
-      share_question_reward: { Args: { p_user_id: string; p_question_id: string }; Returns: number }
       place_prediction: {
         Args: {
           p_coins: number
@@ -622,6 +738,10 @@ export type Database = {
       resolve_question: {
         Args: { p_correct_option: string; p_question_id: string }
         Returns: undefined
+      }
+      share_question_reward: {
+        Args: { p_question_id: string; p_user_id: string }
+        Returns: number
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
@@ -779,4 +899,4 @@ export const Constants = {
 
 export type QuestionOption = { id: string; label: string; icon_url?: string | null }
 export type RankTier = "ผู้มาใหม่" | "ผู้ตื่นรู้" | "นักพยากรณ์" | "โหรมือทอง" | "เซียนทำนาย" | "เทพทำนาย" | "จักรวาลเลือก"
-
+export type Pool = Record<string, number>

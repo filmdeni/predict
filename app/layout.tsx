@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { PageTracker } from '@/components/PageTracker'
 
 export const metadata: Metadata = {
   title: 'ฟันธง — Social Forecasting',
@@ -16,7 +17,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="th" className="h-full">
-      <body className="min-h-full antialiased">{children}</body>
+      <body className="min-h-full antialiased">
+        <PageTracker />
+        {children}
+      </body>
     </html>
   )
 }

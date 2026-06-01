@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Users, HelpCircle, TrendingUp, CheckCircle2 } from 'lucide-react'
+import { Users, HelpCircle, TrendingUp, CheckCircle2, Eye } from 'lucide-react'
 
 interface Stats {
   totalUsers: number
@@ -13,6 +13,10 @@ interface Stats {
   openQuestions: number
   resolvedQuestions: number
   newUsersPerDay: { date: string; count: number }[]
+  visitorSessionsToday: number
+  visitorSessionsWeek: number
+  pageViewsToday: number
+  topPages: { path: string; count: number }[]
 }
 
 export default function AdminDashboard() {
@@ -30,15 +34,29 @@ export default function AdminDashboard() {
       weekAgo.setDate(weekAgo.getDate() - 7)
       const weekISO = weekAgo.toISOString()
 
-      const [usersRes, questionsRes, recentRes] = await Promise.all([
+      const [usersRes, questionsRes, recentRes, visitorTodayRes, visitorWeekRes, pvTodayRes, topPagesRes] = await Promise.all([
         supabase.from('users').select('id, created_at', { count: 'exact' }),
         supabase.from('questions').select('id, status', { count: 'exact' }),
         supabase.from('users').select('created_at').gte('created_at', weekISO).order('created_at'),
+        supabase.from('visitor_sessions').select('id', { count: 'exact' }).gte('first_seen', todayISO),
+        supabase.from('visitor_sessions').select('id', { count: 'exact' }).gte('first_seen', weekISO),
+        supabase.from('page_views').select('id', { count: 'exact' }).gte('viewed_at', todayISO),
+        supabase.from('page_views').select('path').gte('viewed_at', weekISO),
       ])
 
       const allUsers = (usersRes.data ?? []) as { id: string; created_at: string }[]
       const allQuestions = (questionsRes.data ?? []) as { id: string; status: string }[]
       const recentUsers = (recentRes.data ?? []) as { created_at: string }[]
+
+      // Aggregate top pages from last 7 days
+      const pathCounts: Record<string, number> = {}
+      for (const { path } of (topPagesRes.data ?? []) as { path: string }[]) {
+        pathCounts[path] = (pathCounts[path] ?? 0) + 1
+      }
+      const topPages = Object.entries(pathCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([path, count]) => ({ path, count }))
 
       // count by day for last 7 days
       const dayMap: Record<string, number> = {}
@@ -62,6 +80,10 @@ export default function AdminDashboard() {
         openQuestions: allQuestions.filter(q => q.status === 'open').length,
         resolvedQuestions: allQuestions.filter(q => q.status === 'resolved').length,
         newUsersPerDay: Object.entries(dayMap).map(([date, count]) => ({ date, count })),
+        visitorSessionsToday: visitorTodayRes.count ?? 0,
+        visitorSessionsWeek: visitorWeekRes.count ?? 0,
+        pageViewsToday: pvTodayRes.count ?? 0,
+        topPages,
       })
       setLoading(false)
     }
@@ -88,6 +110,31 @@ export default function AdminDashboard() {
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-sm text-gray-400 mt-0.5">ภาพรวมแอป ภาวนา</p>
       </div>
+
+      {/* Visitor stats */}
+      <section className="space-y-3">
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+          <Eye size={13} /> ผู้เยี่ยมชม (ทั้ง login และไม่ login)
+        </h2>
+        <div className="grid grid-cols-3 gap-3">
+          <StatCard label="Sessions วันนี้" value={stats.visitorSessionsToday} icon="👁️" highlight={stats.visitorSessionsToday > 0} />
+          <StatCard label="Sessions 7 วัน" value={stats.visitorSessionsWeek} icon="📊" />
+          <StatCard label="Page views วันนี้" value={stats.pageViewsToday} icon="📄" />
+        </div>
+        {stats.topPages.length > 0 && (
+          <div className="bg-white rounded-2xl p-5 border border-gray-100">
+            <p className="text-sm font-semibold text-gray-700 mb-3">หน้ายอดนิยม (7 วัน)</p>
+            <div className="space-y-2">
+              {stats.topPages.map(({ path, count }) => (
+                <div key={path} className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600 font-mono truncate max-w-xs">{path}</span>
+                  <span className="font-semibold text-gray-900 ml-4 shrink-0">{count.toLocaleString()} views</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* User stats */}
       <section className="space-y-3">
