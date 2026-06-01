@@ -589,6 +589,7 @@ export type Database = {
         Returns: undefined
       }
       daily_login_bonus: { Args: { p_user_id: string }; Returns: number }
+      share_question_reward: { Args: { p_user_id: string; p_question_id: string }; Returns: number }
       place_prediction: {
         Args: {
           p_coins: number
