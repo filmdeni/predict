@@ -6,11 +6,55 @@ import { useSearchParams } from 'next/navigation'
 
 const AVATARS = ['🧑', '👩', '🧔', '👧', '🙎']
 
+function InAppBrowserWarning({ onBack }: { onBack: () => void }) {
+  const [copied, setCopied] = useState(false)
+  const url = typeof window !== 'undefined' ? window.location.href : ''
+
+  async function copyUrl() {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    } catch {
+      // fallback: select text
+    }
+  }
+
+  return (
+    <div className="fade-up text-center space-y-6">
+      <div className="text-4xl">🌐</div>
+      <div className="space-y-2">
+        <p className="text-white/80 font-medium text-lg">ต้องเปิดใน Browser ก่อนนะ</p>
+        <p className="text-white/35 text-sm leading-relaxed">
+          Google ไม่อนุญาตให้เข้าสู่ระบบจาก Messenger หรือ Line<br />
+          ต้องใช้ Safari หรือ Chrome แทน
+        </p>
+      </div>
+      <div className="space-y-3">
+        <p className="text-white/20 text-xs">copy ลิงก์นี้แล้วเปิดใน Safari / Chrome:</p>
+        <div className="flex items-center gap-2 bg-white/[0.05] border border-white/[0.1] rounded-xl px-3 py-2.5">
+          <span className="flex-1 text-white/40 text-xs truncate text-left">{url}</span>
+          <button
+            onClick={copyUrl}
+            className="shrink-0 text-xs text-emerald-400/80 hover:text-emerald-300 transition-colors font-medium"
+          >
+            {copied ? 'คัดลอกแล้ว ✓' : 'คัดลอก'}
+          </button>
+        </div>
+      </div>
+      <button onClick={onBack} className="text-xs text-white/20 hover:text-white/40 transition-colors">
+        ← ใช้ Magic Link ทางอีเมลแทน
+      </button>
+    </div>
+  )
+}
+
 function LoginForm() {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [inAppBrowserBlocked, setInAppBrowserBlocked] = useState(false)
   const searchParams = useSearchParams()
   const next = searchParams.get('next') ?? '/feed'
   const supabase = createClient()
@@ -35,8 +79,7 @@ function LoginForm() {
 
   async function handleGoogle() {
     if (isInAppBrowser()) {
-      const ua = navigator.userAgent
-      setError('กรุณาเปิดลิงก์นี้ใน Safari หรือ Chrome เพื่อเข้าสู่ระบบด้วย Google')
+      setInAppBrowserBlocked(true)
       return
     }
     await supabase.auth.signInWithOAuth({
@@ -77,7 +120,9 @@ function LoginForm() {
 
       <div className="relative z-10 w-full max-w-[360px] py-20 flex flex-col gap-10">
 
-        {sent ? (
+        {inAppBrowserBlocked ? (
+          <InAppBrowserWarning onBack={() => setInAppBrowserBlocked(false)} />
+        ) : sent ? (
           <div className="fade-up text-center space-y-5">
             <div className="text-4xl">📬</div>
             <div className="space-y-2">

@@ -168,8 +168,13 @@ function TrendingSection({
           </span>
         )}
       </div>
-      <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1 -mx-6 px-6">
-        {trending.map((q, i) => (
+      <div className={[
+        'grid gap-3',
+        trending.slice(0, 3).length === 3 ? 'grid-cols-1 sm:grid-cols-[2fr_1fr_1fr]' :
+        trending.slice(0, 3).length === 2 ? 'grid-cols-1 sm:grid-cols-[1.4fr_1fr]' :
+        'grid-cols-1',
+      ].join(' ')}>
+        {trending.slice(0, 3).map((q, i) => (
           <div
             key={q.id}
             draggable={isAdmin}
@@ -178,7 +183,7 @@ function TrendingSection({
             onDragEnd={handleTrendingDragEnd}
             onDragOver={e => e.preventDefault()}
             className={[
-              'flex-shrink-0 w-[260px] animate-fadeInUp relative transition-all',
+              'animate-fadeInUp relative transition-all',
               isAdmin ? 'cursor-grab active:cursor-grabbing' : '',
               trendingOverIndex === i && trendingDragIndex.current !== i ? 'ring-2 ring-orange-400 rounded-xl scale-[1.02]' : '',
               trendingDragIndex.current === i ? 'opacity-40' : '',
@@ -206,7 +211,7 @@ function TrendingSection({
           </div>
         ))}
         {trending.length === 0 && isAdmin && (
-          <div className="flex-shrink-0 w-[260px] h-40 border-2 border-dashed border-orange-300 rounded-xl flex items-center justify-center text-orange-400 text-xs">
+          <div className="h-40 border-2 border-dashed border-orange-300 rounded-xl flex items-center justify-center text-orange-400 text-xs">
             ลากการ์ดมาวางที่นี่
           </div>
         )}
@@ -382,7 +387,15 @@ export default function FeedPage() {
             .in('id', topIds)
             .eq('is_daily_hero', false)
           if (qs) {
-            const auto = (qs as Question[]).map(q => ({ ...q, recent_count: counts[q.id] ?? 0 })).sort((a, b) => b.recent_count - a.recent_count)
+            const soon = Date.now() + 24 * 3600 * 1000
+            const auto = (qs as Question[])
+              .map(q => ({ ...q, recent_count: counts[q.id] ?? 0 }))
+              .sort((a, b) => {
+                const aUrgent = new Date(a.closes_at).getTime() < soon ? 1 : 0
+                const bUrgent = new Date(b.closes_at).getTime() < soon ? 1 : 0
+                if (bUrgent !== aUrgent) return bUrgent - aUrgent
+                return b.recent_count - a.recent_count
+              })
             setTrending([...pinnedList, ...auto])
             return
           }
