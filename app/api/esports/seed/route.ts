@@ -19,9 +19,9 @@ const BOT_WAGERS = [80, 120, 60, 100, 150]
 const GAME_CATEGORY: Record<string, number> = {
   'cs-go':              30, // CS2
   'dota-2':             28, // Dota 2
-  'valorant':           2,  // esports
-  'league-of-legends':  2,  // esports
-  'mlbb':               2,  // Mobile Legends
+  'valorant':           38, // Valorant
+  'league-of-legends':  39, // LoL
+  'mlbb':               37, // Mobile Legends
 }
 
 const GAME_LABEL: Record<string, string> = {
