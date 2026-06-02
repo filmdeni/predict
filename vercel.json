@@ -1,0 +1,24 @@
+{
+  "crons": [
+    {
+      "path": "/api/commodity/seed",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/commodity/resolve",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/commodity/resolve",
+      "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/esports/seed",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/esports/resolve",
+      "schedule": "0 * * * *"
+    }
+  ]
+}

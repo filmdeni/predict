@@ -240,9 +240,37 @@ export default function QuestionPageClient() {
         <div className="flex gap-3 px-4 pb-3">
           <div className="flex-1 min-w-0 space-y-2">
             <h1 className="text-gray-900 font-bold text-lg leading-snug">{question.title}</h1>
-            {question.description && (
-              <p className="text-gray-500 text-sm leading-relaxed line-clamp-3">{question.description}</p>
-            )}
+            {question.description && (() => {
+              try {
+                const meta = JSON.parse(question.description!)
+                if (meta.type === 'esports') {
+                  return (
+                    <div className="space-y-1.5">
+                      {meta.league && (
+                        <p className="text-xs text-indigo-500 font-medium">{meta.league}{meta.serie ? ` · ${meta.serie}` : ''}</p>
+                      )}
+                      {meta.tournament && (
+                        <p className="text-xs text-gray-400">{meta.tournament}{meta.format ? ` · Bo${meta.number_of_games}` : ''}</p>
+                      )}
+                      {meta.stream_url && (
+                        <a href={meta.stream_url} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-purple-600 font-medium hover:underline">
+                          🎮 ดูสด
+                        </a>
+                      )}
+                    </div>
+                  )
+                }
+                if (meta.type === 'commodity') {
+                  return (
+                    <p className="text-xs text-gray-400">เกณฑ์: {meta.threshold?.toLocaleString('th-TH')} {meta.unit}</p>
+                  )
+                }
+                return null
+              } catch {
+                return <p className="text-gray-500 text-sm leading-relaxed line-clamp-3">{question.description}</p>
+              }
+            })()}
             {/* creator */}
             {question.creator && (
               <div className="flex items-center gap-1.5 pt-1">
