@@ -19,6 +19,14 @@
     {
       "path": "/api/esports/resolve",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/sports/seed",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/sports/resolve",
+      "schedule": "0 * * * *"
     }
   ]
 }
