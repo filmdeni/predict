@@ -46,9 +46,10 @@ for (const g of ALL_GROUPS) {
 interface Props {
   selected: string
   onChange: (slug: string) => void
+  hideSubs?: boolean
 }
 
-export default function CategoryFilter({ selected, onChange }: Props) {
+export default function CategoryFilter({ selected, onChange, hideSubs = false }: Props) {
   const [hiddenSlugs, setHiddenSlugs] = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -64,9 +65,12 @@ export default function CategoryFilter({ selected, onChange }: Props) {
 
   const GROUPS = ALL_GROUPS.filter(g => !hiddenSlugs.has(g.slug))
   const activeParent = SUB_TO_PARENT[selected] ?? selected
+  const activeGroup = GROUPS.find(g => g.slug === activeParent)
+  const hasSubs = (activeGroup?.subs?.length ?? 0) > 0
 
   return (
     <div className="border-b border-gray-200 bg-white">
+      {/* Row 1 — main categories */}
       <div className="flex gap-1.5 overflow-x-auto px-6 py-2.5 scrollbar-none">
         {GROUPS.map(g => {
           const isActive = g.slug === activeParent
@@ -88,6 +92,38 @@ export default function CategoryFilter({ selected, onChange }: Props) {
           )
         })}
       </div>
+
+      {/* Row 2 — sub-categories (hidden when sidebar is shown) */}
+      {!hideSubs && hasSubs && activeGroup && (
+        <div className="flex gap-1.5 overflow-x-auto px-6 py-2 scrollbar-none bg-gray-50 border-t border-gray-100">
+          <button
+            onClick={() => onChange(activeParent)}
+            className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-all border ${
+              selected === activeParent
+                ? 'bg-gray-900 text-white border-gray-900'
+                : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+            }`}
+          >
+            ทั้งหมด
+          </button>
+          {activeGroup.subs.map(s => (
+            <button
+              key={s.slug}
+              onClick={() => onChange(s.slug)}
+              className={`flex-shrink-0 flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-all border ${
+                selected === s.slug
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+              }`}
+            >
+              {s.image
+                ? <img src={s.image} alt={s.name} className="w-4 h-4 rounded object-cover flex-shrink-0" />
+                : <span>{s.icon}</span>
+              } {s.name}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
