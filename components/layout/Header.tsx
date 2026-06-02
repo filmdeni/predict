@@ -8,12 +8,14 @@ import { Search, ShieldCheck } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 import SearchModal from './SearchModal'
 import NotificationBell from './NotificationBell'
+import { RANKS } from '@/lib/game/ranks'
 
 const ADMIN_EMAIL = 'zwwzww19192@gmail.com'
 
 export default function Header() {
   const [user, setUser] = useState<User | null>(null)
   const [coins, setCoins] = useState<number | null>(null)
+  const [rank, setRank] = useState<string | null>(null)
   const [showSearch, setShowSearch] = useState(false)
   const router = useRouter()
   const supabase = createClient()
@@ -24,8 +26,11 @@ export default function Header() {
 
     async function fetchCoins() {
       if (!userId) return
-      const { data: profile } = await supabase.from('users').select('coins').eq('id', userId).single()
-      if (profile) setCoins((profile as { coins: number }).coins)
+      const { data: profile } = await supabase.from('users').select('coins, rank').eq('id', userId).single()
+      if (profile) {
+        setCoins((profile as { coins: number; rank: string }).coins)
+        setRank((profile as { coins: number; rank: string }).rank)
+      }
     }
 
     supabase.auth.getUser().then(async ({ data }) => {
@@ -39,7 +44,11 @@ export default function Header() {
         .on(
           'postgres_changes',
           { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${data.user.id}` },
-          (payload) => { setCoins((payload.new as { coins: number }).coins) }
+          (payload) => {
+            const p = payload.new as { coins: number; rank: string }
+            setCoins(p.coins)
+            setRank(p.rank)
+          }
         )
         .subscribe()
     })
@@ -96,8 +105,8 @@ export default function Header() {
               </Link>
             )}
             <Link href="/profile/me">
-              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-sm font-semibold text-green-700">
-                {(user.user_metadata?.full_name ?? user.email ?? '?')[0].toUpperCase()}
+              <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-lg leading-none">
+                {rank ? (RANKS.find(r => r.tier === rank)?.emoji ?? '🌫️') : (user.user_metadata?.full_name ?? user.email ?? '?')[0].toUpperCase()}
               </div>
             </Link>
           </div>

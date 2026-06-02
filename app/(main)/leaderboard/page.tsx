@@ -18,7 +18,7 @@ export default function LeaderboardPage() {
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [tab, setTab] = useState<'reputation' | 'coins' | 'winrate' | 'streak'>('reputation')
+  const [tab, setTab] = useState<'coins' | 'winrate' | 'streak'>('coins')
   const supabase = createClient()
 
   const load = useCallback(async (silent = false) => {
@@ -45,7 +45,7 @@ export default function LeaderboardPage() {
       }).slice(0, 20)
       setUsers(sorted)
     } else {
-      const orderCol = tab === 'reputation' ? 'reputation' : 'win_streak'
+      const orderCol = 'win_streak'
       const { data } = await supabase
         .from('users')
         .select('*')
@@ -96,7 +96,6 @@ export default function LeaderboardPage() {
       {/* Tabs */}
       <div className="flex gap-1.5 bg-gray-100 rounded-xl p-1">
         {([
-          { key: 'reputation', label: 'Rep' },
           { key: 'coins', label: 'คะแนน' },
           { key: 'winrate', label: 'ทายถูก' },
           { key: 'streak', label: 'Streak' },
@@ -159,12 +158,7 @@ export default function LeaderboardPage() {
                   })()}
                 </div>
                 <div className="text-right">
-                  {tab === 'reputation' ? (
-                    <div className="flex items-center gap-1.5 justify-end">
-                      <span className="text-sm font-bold text-gray-900">{Number(u.reputation ?? 0).toLocaleString()}</span>
-                      <span className="text-xs text-gray-400">rep</span>
-                    </div>
-                  ) : tab === 'coins' ? (
+                  {tab === 'coins' ? (
                     <div className="flex items-center gap-1 justify-end">
                       <span className="text-sm font-bold text-gray-900">{Number(u.coins).toLocaleString()}</span>
                       <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-yellow-400 text-white text-[9px] font-bold leading-none">P</span>
