@@ -261,6 +261,34 @@ export default function QuestionPageClient() {
                     </div>
                   )
                 }
+                if (meta.type === 'sports') {
+                  return (
+                    <div className="space-y-1.5">
+                      {meta.event_name && (
+                        <p className="text-xs text-red-500 font-medium">{meta.event_name}</p>
+                      )}
+                      <div className="flex flex-wrap gap-x-3 gap-y-1">
+                        {meta.weight_class && (
+                          <span className="text-xs text-gray-500">🥊 {meta.weight_class}</span>
+                        )}
+                        {meta.venue && (
+                          <span className="text-xs text-gray-400">📍 {meta.venue}</span>
+                        )}
+                        {meta.broadcast && (
+                          <span className="text-xs text-gray-400">📺 {meta.broadcast}</span>
+                        )}
+                      </div>
+                      <div className="flex gap-4">
+                        {meta.team_a?.record && (
+                          <span className="text-xs text-gray-500">{meta.team_a.name} <span className="text-gray-400">{meta.team_a.record}</span></span>
+                        )}
+                        {meta.team_b?.record && (
+                          <span className="text-xs text-gray-500">{meta.team_b.name} <span className="text-gray-400">{meta.team_b.record}</span></span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                }
                 if (meta.type === 'commodity') {
                   return (
                     <p className="text-xs text-gray-400">เกณฑ์: {meta.threshold?.toLocaleString('th-TH')} {meta.unit}</p>

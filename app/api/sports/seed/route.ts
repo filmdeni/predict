@@ -55,12 +55,16 @@ async function fetchEvents(league: typeof LEAGUES[number]): Promise<ESPNEvent[]>
   if (sport === 'mma') {
     const events: ESPNEvent[] = []
     for (const ev of data.events ?? []) {
+      const eventName: string = ev.name ?? ''
+      const venue: string = ev.venues?.[0]?.fullName ?? ''
+      const broadcast: string = ev.competitions?.[0]?.broadcast ?? ''
       for (const comp of ev.competitions ?? []) {
         const fighters = (comp.competitors ?? []).map((c: any) => ({
           team: {
             id: c.athlete?.id ?? c.id,
             displayName: c.athlete?.displayName ?? c.id,
             logo: c.athlete?.flag?.href ?? null,
+            record: c.records?.[0]?.summary ?? null,
           },
           homeAway: c.order === 1 ? 'home' : 'away',
           winner: c.winner,
@@ -70,7 +74,15 @@ async function fetchEvents(league: typeof LEAGUES[number]): Promise<ESPNEvent[]>
           events.push({
             id: comp.id,
             date: comp.date ?? ev.date,
-            competitions: [{ status: comp.status, competitors: fighters }],
+            competitions: [{
+              status: comp.status,
+              competitors: fighters,
+              // @ts-ignore extra fields
+              weight_class: comp.type?.abbreviation ?? null,
+              event_name: eventName,
+              venue,
+              broadcast,
+            }],
           })
         }
       }
@@ -173,8 +185,16 @@ async function handler(req: Request) {
             event_id: event.id,
             league: league.slug,
             league_name: league.name,
-            team_a: { id: optA, name: teamA.team.displayName },
-            team_b: { id: optB, name: teamB.team.displayName },
+            team_a: { id: optA, name: teamA.team.displayName, record: (teamA.team as any).record ?? null },
+            team_b: { id: optB, name: teamB.team.displayName, record: (teamB.team as any).record ?? null },
+            // @ts-ignore
+            weight_class: comp.weight_class ?? null,
+            // @ts-ignore
+            event_name: comp.event_name ?? null,
+            // @ts-ignore
+            venue: comp.venue ?? null,
+            // @ts-ignore
+            broadcast: comp.broadcast ?? null,
           }),
           image_url: league.image ?? null,
           options,
