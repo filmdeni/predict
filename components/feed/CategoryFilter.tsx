@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 export const PARENT_SUBS: Record<string, string[]> = {
-  esports: ['esports', 'dota2', 'apex', 'cs2', 'rov'],
+  esports: ['esports', 'dota2', 'cs2', 'mlbb'],
   sports:  ['sports', 'football', 'boxing', 'nba'],
 }
 
@@ -20,9 +20,8 @@ const ALL_GROUPS = [
     name: 'eSports',
     subs: [
       { slug: 'dota2', name: 'Dota 2', icon: '🔴' },
-      { slug: 'apex',  name: 'Apex',   icon: '🎯' },
       { slug: 'cs2',   name: 'CS2',    icon: '🔫' },
-      { slug: 'rov',   name: 'ROV',    icon: '⚔️' },
+      { slug: 'mlbb',  name: 'MLBB',   icon: '⚔️' },
     ],
   },
   {
