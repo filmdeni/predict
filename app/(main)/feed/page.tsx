@@ -318,36 +318,29 @@ export default function FeedPage() {
         supabase.from('questions').select('total_pool').eq('status', 'open'),
       ])
       const totalPool = (openQs ?? []).reduce((s, q) => s + ((q as { total_pool: number }).total_pool ?? 0), 0)
-      // seed daily offset from date so it's consistent within a day but changes each day
-      const today = new Date()
-      const daySeed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate()
-      const dailyOffset = 180 + (daySeed % 97) + (daySeed % 43)
       setStats({
-        todayPredictions: (todayCount ?? 0) + dailyOffset,
+        todayPredictions: todayCount ?? 0,
         openCount: (openQs ?? []).length,
         totalPool,
       })
     }
     loadStats()
-  }, [])
 
-  // mock realtime ticker: randomly bump predictions + pool every 6–14s
-  useEffect(() => {
-    if (!stats) return
-    const schedule = () => setTimeout(() => {
-      const predDelta = Math.random() < 0.7 ? 1 : 2
-      const poolDelta = predDelta * (Math.floor(Math.random() * 180) + 40)
-      setStats(prev => prev ? {
-        ...prev,
-        todayPredictions: prev.todayPredictions + predDelta,
-        totalPool: prev.totalPool + poolDelta,
-      } : prev)
-      setTickKey(k => k + 1)
-      timer = schedule()
-    }, 6000 + Math.random() * 8000)
-    let timer = schedule()
-    return () => clearTimeout(timer)
-  }, [!!stats])
+    const channel = supabase
+      .channel('feed-stats-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'predictions' }, (payload) => {
+        const amount = (payload.new as { coins_wagered?: number }).coins_wagered ?? 0
+        setStats(prev => prev ? {
+          ...prev,
+          todayPredictions: prev.todayPredictions + 1,
+          totalPool: prev.totalPool + amount,
+        } : prev)
+        setTickKey(k => k + 1)
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
   useEffect(() => {
     async function loadTrending() {

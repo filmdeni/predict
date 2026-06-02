@@ -1,151 +1,100 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Database } from '@/lib/supabase/types'
-
-type Question = Database['public']['Tables']['questions']['Row'] & {
-  categories: { name_th: string; emoji: string; slug: string }
-}
-
-// Mock active usernames with rank flavour
-const MOCK_USERS: { name: string; rank: string; color: string }[] = [
-  { name: 'ดราม่าควีน', rank: 'Oracle', color: 'text-yellow-600' },
-  { name: 'เซียนหุ้น88', rank: 'Sage', color: 'text-purple-600' },
-  { name: 'ลุงโหร', rank: 'Prophet', color: 'text-rose-600' },
-  { name: 'กาแฟดำ', rank: 'Awakened', color: 'text-sky-600' },
-  { name: 'นกฮูกดึก', rank: 'Seer', color: 'text-emerald-600' },
-  { name: 'ฟ้ามีตา', rank: 'Chosen', color: 'text-indigo-600' },
-  { name: 'ขาลุ้น007', rank: 'Wanderer', color: 'text-gray-600' },
-  { name: 'จักรวาลบอก', rank: 'Oracle', color: 'text-yellow-600' },
-  { name: 'ตาดีมีเฮง', rank: 'Seer', color: 'text-emerald-600' },
-  { name: 'โหรอินดี้', rank: 'Prophet', color: 'text-rose-600' },
-]
-
-type EventKind = 'flip' | 'big_wager' | 'consensus' | 'hot'
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
 interface ActivityEvent {
-  id: number
-  kind: EventKind
-  user?: { name: string; rank: string; color: string }
+  id: string
+  userName: string
+  rank: string
   questionTitle: string
-  detail: string
-  emoji: string
+  optionLabel: string
+  amount: number
 }
 
-function truncate(s: string, n = 20) {
+function truncate(s: string, n = 22) {
   return s.length > n ? s.slice(0, n) + '…' : s
 }
 
-function buildEvents(questions: Question[], seed: number): ActivityEvent[] {
-  if (questions.length === 0) return []
-  const events: ActivityEvent[] = []
-  let id = seed
-
-  const open = questions.filter(q => q.status === 'open')
-  const pool = open.length > 0 ? open : questions
-
-  for (let i = 0; i < 12; i++) {
-    const q = pool[(seed + i * 7) % pool.length]
-    const user = MOCK_USERS[(seed + i * 3) % MOCK_USERS.length]
-    const opts = q.options as { id: string; label: string }[]
-    const isBinary = opts.length === 2
-
-    const kind: EventKind = (['flip', 'big_wager', 'consensus', 'hot'] as const)[(seed + i * 2) % 4]
-
-    if (kind === 'flip' && isBinary) {
-      const fromLabel = i % 2 === 0 ? 'ไม่' : 'ใช่'
-      const toLabel   = fromLabel === 'ไม่' ? 'ใช่' : 'ไม่'
-      events.push({
-        id: id++, kind, user,
-        questionTitle: truncate(q.title),
-        detail: `เปลี่ยนใจจาก ${fromLabel} → ${toLabel}`,
-        emoji: '🔄',
-      })
-    } else if (kind === 'big_wager') {
-      const amount = (200 + ((seed + i * 137) % 20) * 200).toLocaleString()
-      events.push({
-        id: id++, kind, user,
-        questionTitle: truncate(q.title),
-        detail: `ทุ่ม ${amount}P`,
-        emoji: '💰',
-      })
-    } else if (kind === 'consensus') {
-      const pct = 65 + ((seed + i * 11) % 30)
-      const label = isBinary ? 'ใช่' : truncate(opts[0]?.label ?? '?', 10)
-      events.push({
-        id: id++, kind,
-        questionTitle: truncate(q.title),
-        detail: `${pct}% เลือก "${label}"`,
-        emoji: '📊',
-      })
-    } else {
-      const count = 8 + ((seed + i * 19) % 40)
-      events.push({
-        id: id++, kind,
-        questionTitle: truncate(q.title),
-        detail: `${count} คนทายในชั่วโมงนี้`,
-        emoji: '🔥',
-      })
-    }
-  }
-
-  return events
+const RANK_COLOR: Record<string, string> = {
+  'ผู้มาใหม่':   'text-gray-600',
+  'ผู้ตื่นรู้':  'text-sky-600',
+  'นักพยากรณ์':  'text-emerald-600',
+  'โหรมือทอง':   'text-yellow-600',
+  'เซียนทำนาย':  'text-orange-600',
+  'เทพทำนาย':    'text-purple-600',
+  'จักรวาลเลือก':'text-indigo-600',
 }
 
-export default function LiveActivityTicker({ questions, tickKey }: { questions: Question[]; tickKey?: number }) {
-  const [visibleIdx, setVisibleIdx] = useState(0)
+export default function LiveActivityTicker({ tickKey }: { tickKey?: number; questions?: unknown }) {
+  const [events, setEvents] = useState<ActivityEvent[]>([])
+  const [idx, setIdx] = useState(0)
   const [visible, setVisible] = useState(true)
-  const seedRef = useRef(Math.floor(Date.now() / 1000) % 997)
+  const supabase = createClient()
 
-  const events = useMemo(
-    () => buildEvents(questions, seedRef.current),
-    [questions]
-  )
+  async function fetchEvents() {
+    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
+    const { data } = await supabase
+      .from('predictions')
+      .select('id, coins_wagered, option_id, placed_at, users!user_id(display_name, rank), questions!question_id(title, options)')
+      .gte('placed_at', since)
+      .order('placed_at', { ascending: false })
+      .limit(60)
 
-  // Advance event every ~5s; bump seed occasionally via tickKey
+    if (!data || data.length === 0) return
+
+    const evts: ActivityEvent[] = data.flatMap((p) => {
+      const user = p.users as { display_name: string; rank: string } | null
+      const q = p.questions as { title: string; options: { id: string; label: string }[] } | null
+      if (!user || !q) return []
+      const opt = (q.options ?? []).find((o: { id: string; label: string }) => o.id === p.option_id)
+      return [{
+        id: p.id,
+        userName: user.display_name ?? 'ไม่ระบุ',
+        rank: user.rank ?? 'ผู้มาใหม่',
+        questionTitle: q.title,
+        optionLabel: opt?.label ?? '?',
+        amount: p.coins_wagered,
+      }]
+    })
+    setEvents(evts)
+  }
+
+  useEffect(() => {
+    fetchEvents()
+  }, [])
+
+  // bump to next event on tickKey change
+  useEffect(() => {
+    if (!tickKey || events.length === 0) return
+    setVisible(false)
+    setTimeout(() => { setIdx(i => (i + 1) % events.length); setVisible(true) }, 200)
+  }, [tickKey])
+
+  // cycle every 5s
   useEffect(() => {
     if (events.length === 0) return
     const t = setInterval(() => {
       setVisible(false)
-      setTimeout(() => {
-        setVisibleIdx(i => (i + 1) % events.length)
-        if (Math.random() < 0.15) seedRef.current = (seedRef.current + 37) % 997
-        setVisible(true)
-      }, 250)
+      setTimeout(() => { setIdx(i => (i + 1) % events.length); setVisible(true) }, 250)
     }, 5000)
     return () => clearInterval(t)
   }, [events.length])
 
-  // When tick fires (live stats updated), inject a new event 30% of the time
-  useEffect(() => {
-    if (!tickKey || events.length === 0) return
-    if (Math.random() < 0.3) {
-      setVisible(false)
-      setTimeout(() => {
-        setVisibleIdx(i => (i + 1) % events.length)
-        setVisible(true)
-      }, 200)
-    }
-  }, [tickKey])
-
   if (events.length === 0) return null
 
-  const ev = events[visibleIdx]
+  const ev = events[idx]
 
   return (
     <div className="mx-6 mt-2 mb-1">
-      <div
-        className={`flex items-center gap-2 text-[11px] bg-white border border-gray-100 rounded-full px-3 py-1.5 shadow-sm transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0'}`}
-      >
-        <span className="text-[11px]">{ev.emoji}</span>
-        {ev.user && (
-          <span className={`font-semibold ${ev.user.color} flex-shrink-0`}>
-            {ev.user.name}
-          </span>
-        )}
-        <span className="text-gray-500 flex-shrink-0">{ev.detail}</span>
+      <div className={`flex items-center gap-2 text-[11px] bg-white border border-gray-100 rounded-full px-3 py-1.5 shadow-sm transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0'}`}>
+        <span>🔮</span>
+        <span className={`font-semibold flex-shrink-0 ${RANK_COLOR[ev.rank] ?? 'text-gray-600'}`}>
+          {ev.userName}
+        </span>
+        <span className="text-gray-500 flex-shrink-0">ทาย "{truncate(ev.optionLabel, 12)}"</span>
         <span className="text-gray-300 flex-shrink-0">·</span>
-        <span className="text-gray-400 truncate">{ev.questionTitle}</span>
+        <span className="text-gray-400 truncate">{truncate(ev.questionTitle)}</span>
       </div>
     </div>
   )
