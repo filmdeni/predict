@@ -351,10 +351,7 @@ export default function FeedPage() {
         .eq('is_pinned_trending', true)
         .eq('status', 'open')
         .order('trending_sort_order', { ascending: true, nullsFirst: false })
-      const pinnedList: TrendingQuestion[] = ((pinned ?? []) as Question[])
-        .filter((q: Question & { is_daily_hero?: boolean }) => !q.is_daily_hero)
-        .map(q => ({ ...q, recent_count: q.predictions_count }))
-      const pinnedIds = new Set(pinnedList.map(q => q.id))
+      const pinnedIds = new Set(((pinned ?? []) as Question[]).map(q => q.id))
 
       const since24h = new Date(Date.now() - 86400000).toISOString()
       const { data: raw } = await supabase
@@ -362,11 +359,16 @@ export default function FeedPage() {
         .select('question_id')
         .gte('placed_at', since24h)
 
+      const counts: Record<string, number> = {}
+      ;(raw ?? [] as { question_id: string }[]).forEach((r: { question_id: string }) => {
+        counts[r.question_id] = (counts[r.question_id] ?? 0) + 1
+      })
+
+      const pinnedList: TrendingQuestion[] = ((pinned ?? []) as Question[])
+        .filter((q: Question & { is_daily_hero?: boolean }) => !q.is_daily_hero)
+        .map(q => ({ ...q, recent_count: counts[q.id] ?? 0 }))
+
       if (raw && raw.length > 0) {
-        const counts: Record<string, number> = {}
-        ;(raw as { question_id: string }[]).forEach(r => {
-          counts[r.question_id] = (counts[r.question_id] ?? 0) + 1
-        })
         const topIds = Object.entries(counts)
           .sort((a, b) => b[1] - a[1])
           .filter(([id]) => !pinnedIds.has(id))
@@ -397,7 +399,7 @@ export default function FeedPage() {
 
       if (pinnedList.length > 0) { setTrending(pinnedList); return }
 
-      // fallback: top 4 by total predictions_count
+      // fallback: top 4 by predictions in last 24h
       const { data: fallback } = await supabase
         .from('questions')
         .select('*, categories(name_th, emoji, slug)')
@@ -406,7 +408,7 @@ export default function FeedPage() {
         .order('predictions_count', { ascending: false })
         .limit(4)
       if (fallback) {
-        setTrending((fallback as Question[]).map(q => ({ ...q, recent_count: q.predictions_count })))
+        setTrending((fallback as Question[]).map(q => ({ ...q, recent_count: counts[q.id] ?? 0 })))
       }
     }
     loadTrending()
