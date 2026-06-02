@@ -3,13 +3,14 @@
 import { useEffect, useState, Suspense, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { TrendingUp, Users } from 'lucide-react'
+import { TrendingUp, Users, ArrowRight, BarChart2, Radio } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getPoolShares } from '@/lib/game/odds'
 import QuestionCard from '@/components/feed/QuestionCard'
-import CategoryFilter, { PARENT_SUBS } from '@/components/feed/CategoryFilter'
-import TopPredictors from '@/components/feed/TopPredictors'
+import CategoryFilter, { PARENT_SUBS, ALL_GROUPS, SUB_TO_PARENT, SIDEBAR_PARENTS } from '@/components/feed/CategoryFilter'
 import LiveActivityTicker from '@/components/feed/LiveActivityTicker'
+import CommunityTicker from '@/components/feed/CommunityTicker'
+import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import type { Database } from '@/lib/supabase/types'
 
 const ADMIN_EMAIL = 'zwwzww19192@gmail.com'
@@ -24,16 +25,7 @@ const draggedQuestionRef = { current: null as Question | null }
 
 // ── Admin drag-to-reorder grid ──────────────────────────────────────────────
 function DraggableGrid({
-  items,
-  isAdmin,
-  savedIds,
-  predictedIds,
-  hotIds,
-  hotCounts,
-  pinnedHeroId,
-  onDelete,
-  onReorder,
-  onDragStart,
+  items, isAdmin, savedIds, predictedIds, hotIds, hotCounts, pinnedHeroId, onDelete, onReorder, onDragStart,
 }: {
   items: Question[]
   isAdmin: boolean
@@ -49,26 +41,20 @@ function DraggableGrid({
   const dragIndex = useRef<number | null>(null)
   const [overIndex, setOverIndex] = useState<number | null>(null)
 
-  function handleDragStart(i: number, q: Question) {
-    dragIndex.current = i
-    onDragStart?.(q)
-  }
+  function handleDragStart(i: number, q: Question) { dragIndex.current = i; onDragStart?.(q) }
   function handleDragEnter(i: number) { setOverIndex(i) }
   function handleDragEnd() {
     const from = dragIndex.current
-    if (from === null || overIndex === null || from === overIndex) {
-      dragIndex.current = null; setOverIndex(null); return
-    }
+    if (from === null || overIndex === null || from === overIndex) { dragIndex.current = null; setOverIndex(null); return }
     const next = [...items]
     const [moved] = next.splice(from, 1)
     next.splice(overIndex, 0, moved)
-    dragIndex.current = null
-    setOverIndex(null)
+    dragIndex.current = null; setOverIndex(null)
     onReorder(next)
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
       {items.map((q, i) => (
         <div
           key={q.id}
@@ -105,122 +91,279 @@ function DraggableGrid({
   )
 }
 
-function TrendingSection({
-  trending, isAdmin, trendingDropOver, savedIds, predictedIds, hotCounts,
-  onDropOver, onDrop, onUnpin, onDelete, onReorder, onDragStart,
-}: {
-  trending: TrendingQuestion[]
-  isAdmin: boolean
-  trendingDropOver: boolean
+// ── Future Radar Card — horizontal layout ────────────────────────────────────
+function FutureRadarCard({ question, isHot, recentCount, predictedIds }: {
+  question: TrendingQuestion
+  isHot?: boolean
+  recentCount?: number
   savedIds: Set<string>
   predictedIds: Set<string>
-  hotCounts: Record<string, number>
-  onDropOver: (v: boolean) => void
-  onDrop: () => void
-  onUnpin: (id: string) => void
-  onDelete: (id: string) => void
-  onReorder: (items: TrendingQuestion[]) => void
-  onDragStart: (q: TrendingQuestion) => void
 }) {
-  const trendingDragIndex = useRef<number | null>(null)
-  const [trendingOverIndex, setTrendingOverIndex] = useState<number | null>(null)
+  const shares = getPoolShares(question.pool)
+  const options = question.options as { id: string; label: string }[]
+  const yesPct = shares[options[0]?.id ?? ''] ?? 0
+  const noPct = options.length >= 2 ? (shares[options[1]?.id ?? ''] ?? 0) : 100 - yesPct
 
-  function handleTrendingDragStart(i: number, q: TrendingQuestion) {
-    trendingDragIndex.current = i
-    onDragStart(q)
-  }
-  function handleTrendingDragEnd() {
-    const from = trendingDragIndex.current
-    if (from === null || trendingOverIndex === null || from === trendingOverIndex) {
-      trendingDragIndex.current = null; setTrendingOverIndex(null); return
-    }
-    const next = [...trending]
-    const [moved] = next.splice(from, 1)
-    next.splice(trendingOverIndex, 0, moved)
-    trendingDragIndex.current = null
-    setTrendingOverIndex(null)
-    onReorder(next)
-  }
+  const daysLeft = Math.floor((new Date(question.closes_at).getTime() - Date.now()) / 86400000)
+  const badge = isHot
+    ? { label: '🔥 HOT',      cls: 'bg-orange-500' }
+    : daysLeft > 14
+    ? { label: '✨ NEW',      cls: 'bg-yellow-500' }
+    : { label: '📈 TRENDING', cls: 'bg-indigo-500' }
+
+  const [confLabel, confDot, confText] =
+    question.predictions_count >= 100
+      ? ['เชื่อมั่นสูง',      'bg-emerald-400', 'text-emerald-600']
+      : question.predictions_count >= 30
+      ? ['เชื่อมั่นปานกลาง', 'bg-amber-400',   'text-amber-600']
+      : ['ข้อมูลน้อย',       'bg-gray-300',    'text-gray-400']
 
   return (
-    <section
-      onDragOver={isAdmin ? e => { e.preventDefault(); if (trendingDragIndex.current === null) onDropOver(true) } : undefined}
-      onDragLeave={isAdmin ? () => onDropOver(false) : undefined}
-      onDrop={isAdmin ? e => { e.preventDefault(); onDropOver(false); if (trendingDragIndex.current === null) onDrop() } : undefined}
-      className={[
-        'rounded-2xl transition-all',
-        isAdmin && trendingDropOver ? 'ring-2 ring-orange-400 bg-orange-50/50 p-2 -m-2' : '',
-      ].join(' ')}
-    >
-      <div className="flex items-center gap-2 mb-3">
-        <TrendingUp size={16} className="text-orange-500" />
-        <h2 className="text-sm font-bold text-gray-900">มาแรงตอนนี้</h2>
-        {trending.length > 0 && (
-          <span className="text-[11px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-            {trending[0].recent_count}+ ทายใน 24 ชม.
+    <Link href={`/question/${question.id}`}>
+      <article className="w-80 flex-shrink-0 bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex h-36">
+
+        {/* Left — square thumbnail */}
+        <div className="relative w-28 flex-shrink-0 bg-gradient-to-br from-slate-700 to-indigo-900 self-stretch">
+          {question.image_url
+            ? /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={question.image_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            : <div className="absolute inset-0 flex items-center justify-center text-4xl">{question.categories.emoji}</div>
+          }
+          <span className={`absolute top-2 left-2 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md ${badge.cls}`}>
+            {badge.label}
           </span>
-        )}
-        {isAdmin && (
-          <span className={[
-            'text-[10px] px-2 py-0.5 rounded-full transition-colors',
-            trendingDropOver ? 'text-orange-600 bg-orange-100' : 'text-orange-400 bg-orange-50',
-          ].join(' ')}>
-            {trendingDropOver ? '↓ วางที่นี่' : '⠿ ลากการ์ดมาวางเพื่อปักหมุด'}
-          </span>
-        )}
-      </div>
-      <div className={[
-        'grid gap-3',
-        trending.slice(0, 3).length === 3 ? 'grid-cols-1 sm:grid-cols-[2fr_1fr_1fr]' :
-        trending.slice(0, 3).length === 2 ? 'grid-cols-1 sm:grid-cols-[1.4fr_1fr]' :
-        'grid-cols-1',
-      ].join(' ')}>
-        {trending.slice(0, 3).map((q, i) => (
-          <div
-            key={q.id}
-            draggable={isAdmin}
-            onDragStart={() => handleTrendingDragStart(i, q)}
-            onDragEnter={() => setTrendingOverIndex(i)}
-            onDragEnd={handleTrendingDragEnd}
-            onDragOver={e => e.preventDefault()}
-            className={[
-              'animate-fadeInUp relative transition-all',
-              isAdmin ? 'cursor-grab active:cursor-grabbing' : '',
-              trendingOverIndex === i && trendingDragIndex.current !== i ? 'ring-2 ring-orange-400 rounded-xl scale-[1.02]' : '',
-              trendingDragIndex.current === i ? 'opacity-40' : '',
-            ].join(' ')}
-            style={{ animationDelay: `${i * 40}ms` }}
-          >
-            {isAdmin && (q as Question & { is_pinned_trending?: boolean }).is_pinned_trending && (
-              <button
-                onClick={() => onUnpin(q.id)}
-                className="absolute top-2 right-2 z-30 bg-orange-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none hover:bg-orange-600 transition-colors"
-                title="ถอนออกจากมาแรง"
-              >
-                📌 unpin
-              </button>
-            )}
-            <QuestionCard
-              question={q}
-              isAdmin={isAdmin}
-              isHot
-              recentCount={q.recent_count}
-              initialSaved={savedIds.has(q.id)}
-              isPredicted={predictedIds.has(q.id)}
-              onDelete={onDelete}
-            />
+          {predictedIds.has(question.id) && (
+            <span className="absolute bottom-2 left-2 bg-indigo-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
+              ทายแล้ว
+            </span>
+          )}
+        </div>
+
+        {/* Right — content */}
+        <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
+          <p className="text-[12.5px] font-semibold text-gray-900 line-clamp-2 leading-snug">{question.title}</p>
+
+          {/* Probability display */}
+          {options.length > 2 ? (
+            <div className="space-y-1">
+              {options.slice(0, 2).map((opt, i) => {
+                const barCls = ['bg-green-400', 'bg-blue-400']
+                const txtCls = ['text-green-700', 'text-blue-700']
+                const pct = shares[opt.id] ?? 0
+                return (
+                  <div key={opt.id}>
+                    <div className="flex justify-between mb-0.5 text-[10px]">
+                      <span className="text-gray-500 truncate max-w-[90px]">{opt.label}</span>
+                      <span className={`font-bold ${txtCls[i]}`}>{pct.toFixed(0)}%</span>
+                    </div>
+                    <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                      <div className={`h-full ${barCls[i]} rounded-full`} style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px] font-bold">
+                <span className="text-green-600">{yesPct.toFixed(0)}% {options[0]?.label ?? 'ใช่'}</span>
+                <span className="text-red-500">{noPct.toFixed(0)}% {options[1]?.label ?? 'ไม่'}</span>
+              </div>
+              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden flex">
+                <div className="h-full bg-green-400 transition-all" style={{ width: `${yesPct}%` }} />
+                <div className="h-full bg-red-400 flex-1" />
+              </div>
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-gray-400">
+              👥 {question.predictions_count.toLocaleString()}
+              {recentCount ? ` · 🔥 ${recentCount}` : ''}
+            </span>
+            <span className={`flex items-center gap-1 text-[10px] font-medium ${confText}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${confDot}`} />
+              {confLabel}
+            </span>
           </div>
-        ))}
-        {trending.length === 0 && isAdmin && (
-          <div className="h-40 border-2 border-dashed border-orange-300 rounded-xl flex items-center justify-center text-orange-400 text-xs">
-            ลากการ์ดมาวางที่นี่
-          </div>
-        )}
-      </div>
-    </section>
+        </div>
+      </article>
+    </Link>
   )
 }
 
+// ── Top Predictors mini row ──────────────────────────────────────────────────
+type TopUser = { id: string; username: string; display_name: string; avatar_url: string | null; correct_predictions: number; total_predictions: number; rank: string }
+
+function TopPredictorsRow() {
+  const [users, setUsers] = useState<TopUser[]>([])
+  const supabase = createClient()
+
+  useEffect(() => {
+    supabase
+      .from('users')
+      .select('id, username, display_name, avatar_url, correct_predictions, total_predictions, rank')
+      .order('correct_predictions', { ascending: false })
+      .limit(5)
+      .then(({ data }) => setUsers((data as TopUser[]) ?? []))
+  }, [])
+
+  if (users.length === 0) return null
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-base">🏆</span>
+          <h2 className="text-sm font-bold text-gray-900">นักทายอันดับต้น</h2>
+          <span className="text-xs text-gray-400">แม่นที่สุดเดือนนี้</span>
+        </div>
+        <Link href="/leaderboard" className="text-xs text-indigo-600 font-semibold flex items-center gap-0.5 hover:text-indigo-800">
+          ดูทั้งหมด <ArrowRight size={12} />
+        </Link>
+      </div>
+
+      <div className="flex items-end gap-4 overflow-x-auto pb-1 scrollbar-none">
+        {users.map((u, i) => {
+          const accuracy = u.total_predictions > 0
+            ? Math.round((u.correct_predictions / u.total_predictions) * 100)
+            : 0
+          const MEDAL = ['🥇', '🥈', '🥉']
+          return (
+            <Link key={u.id} href={`/profile/${u.username}`} className="flex flex-col items-center gap-1.5 flex-shrink-0 hover:opacity-80 transition-opacity">
+              <div className="relative">
+                <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-lg font-bold text-indigo-700 border-2 border-white shadow-sm">
+                  {u.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={u.avatar_url} alt={u.display_name} className="w-full h-full rounded-full object-cover" />
+                  ) : (
+                    (u.display_name ?? u.username ?? '?')[0].toUpperCase()
+                  )}
+                </div>
+                <span className="absolute -top-1 -left-1 text-sm">{MEDAL[i] ?? `${i + 1}`}</span>
+              </div>
+              <p className="text-xs font-semibold text-gray-800 text-center max-w-[60px] truncate">{u.display_name?.split(' ')[0] ?? u.username}</p>
+              <p className="text-xs font-bold text-green-600">{accuracy}%</p>
+              <p className="text-[10px] text-gray-400">ความแม่น</p>
+            </Link>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Market Overview chart ────────────────────────────────────────────────────
+const MOCK_CHART_7D = [
+  { d: 'May 15', v: 8000 }, { d: 'May 16', v: 11000 }, { d: 'May 17', v: 9500 },
+  { d: 'May 18', v: 14000 }, { d: 'May 19', v: 13000 }, { d: 'May 20', v: 17000 }, { d: 'May 21', v: 21000 },
+]
+
+function MarketOverview({ stats }: { stats: { todayPredictions: number; openCount: number; totalPool: number } | null }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <BarChart2 size={16} className="text-indigo-500" />
+        <h2 className="text-sm font-bold text-gray-900">ภาพรวมตลาด</h2>
+        <span className="text-xs text-gray-400">กิจกรรมการทายทั้งหมด</span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-xs text-gray-400">คำถามทั้งหมด</p>
+          <p className="text-2xl font-bold text-gray-900">{stats?.openCount.toLocaleString() ?? '—'}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-400">ทายวันนี้</p>
+          <div className="flex items-end gap-1.5">
+            <p className="text-2xl font-bold text-gray-900">{stats?.todayPredictions.toLocaleString() ?? '—'}</p>
+            <p className="text-xs text-emerald-500 font-semibold pb-0.5">▲ สด</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="h-28">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={MOCK_CHART_7D}>
+            <XAxis dataKey="d" tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+            <Tooltip
+              contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e5e7eb' }}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              formatter={(v: any) => [typeof v === 'number' ? v.toLocaleString() : v, 'ทาย']}
+            />
+            <Line type="monotone" dataKey="v" stroke="#6366f1" strokeWidth={2} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  )
+}
+
+
+// ── Hero banner ──────────────────────────────────────────────────────────────
+function HeroBanner({ stats, tickKey }: {
+  stats: { todayPredictions: number; openCount: number; totalPool: number } | null
+  tickKey: number
+}) {
+  return (
+    <div className="relative rounded-3xl overflow-hidden p-8 text-white">
+      <img
+        src="/images/banner-hero.png"
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+      />
+
+      {/* Community ticker — bottom-right overlay */}
+      <div className="absolute bottom-4 right-4 z-10 hidden md:block" style={{ width: "calc(25% - 1rem)" }}>
+        <CommunityTicker height={100} />
+      </div>
+
+      <div className="relative z-10 max-w-xl">
+        <h1 className="text-3xl md:text-4xl font-black leading-tight text-slate-800">
+          ใครจะ<span className="text-indigo-600">ทายแม่น</span>ที่สุด?
+        </h1>
+        <p className="text-sm text-slate-600 mt-2">ร่วมลุ้น ฟันธง และพิสูจน์ว่าคุณอ่านอนาคตออก</p>
+
+        <div className="flex flex-wrap gap-6 mt-6">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-indigo-500/20 flex items-center justify-center">
+              <Users size={14} className="text-indigo-600" />
+            </div>
+            <div>
+              <p key={`pred-${tickKey}`} className="text-lg font-black leading-none animate-tickUp text-slate-800">
+                {stats ? (stats.todayPredictions >= 1000 ? `${(stats.todayPredictions / 1000).toFixed(1)}K` : stats.todayPredictions.toLocaleString()) : '—'}
+              </p>
+              <p className="text-[10px] text-slate-500">ทายวันนี้</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+              <Radio size={14} className="text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-lg font-black leading-none text-slate-800">{stats?.openCount ?? '—'}</p>
+              <p className="text-[10px] text-slate-500">คำถามเปิดอยู่</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-amber-500/20 flex items-center justify-center">
+              <span className="text-amber-600 font-black text-[11px]">P</span>
+            </div>
+            <div>
+              <p key={`pool-${tickKey}`} className="text-lg font-black leading-none animate-tickUp text-slate-800">
+                {stats ? (stats.totalPool >= 1000 ? `${(stats.totalPool / 1000).toFixed(1)}K` : stats.totalPool.toLocaleString()) : '—'}
+              </p>
+              <p className="text-[10px] text-slate-500">คะแนนรวม</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Referral capture ─────────────────────────────────────────────────────────
 function ReferralCapture() {
   const searchParams = useSearchParams()
   useEffect(() => {
@@ -230,6 +373,7 @@ function ReferralCapture() {
   return null
 }
 
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function FeedPage() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [trending, setTrending] = useState<TrendingQuestion[]>([])
@@ -242,7 +386,6 @@ export default function FeedPage() {
   const [tickKey, setTickKey] = useState(0)
   const [mainGridOrdered, setMainGridOrdered] = useState<Question[]>([])
   const [trendingDropOver, setTrendingDropOver] = useState(false)
-  const [heroDropOver, setHeroDropOver] = useState(false)
   const [pinnedHeroId, setPinnedHeroId] = useState<string | null>(null)
   const [now, setNow] = useState(() => new Date())
   const supabase = createClient()
@@ -250,40 +393,37 @@ export default function FeedPage() {
   const pinToTrending = useCallback(async (q: Question) => {
     if (trending.some(t => t.id === q.id)) return
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await supabase.from('questions').update({ is_pinned_trending: true, is_daily_hero: false }).eq('id', q.id)
+    await supabase.from('questions').update({ is_pinned_trending: true, is_daily_hero: false } as any).eq('id', q.id)
     if (pinnedHeroId === q.id) setPinnedHeroId(null)
     setTrending(prev => [{ ...q, recent_count: q.predictions_count, is_pinned_trending: true }, ...prev].slice(0, 4))
-  }, [supabase, trending])
+  }, [supabase, trending, pinnedHeroId])
 
   const saveTrendingOrder = useCallback(async (ordered: TrendingQuestion[]) => {
     setTrending(ordered)
     for (let i = 0; i < ordered.length; i++) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await supabase.from('questions').update({ trending_sort_order: i }).eq('id', ordered[i].id)
+      await supabase.from('questions').update({ trending_sort_order: i } as any).eq('id', ordered[i].id)
     }
   }, [supabase])
 
   const unpinFromTrending = useCallback(async (id: string) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await supabase.from('questions').update({ is_pinned_trending: false }).eq('id', id)
-    setTrending(prev => {
-      const unpinned = prev.find(t => t.id === id)
-      return prev.filter(t => t.id !== id)
-    })
+    await supabase.from('questions').update({ is_pinned_trending: false } as any).eq('id', id)
+    setTrending(prev => prev.filter(t => t.id !== id))
   }, [supabase])
 
   const pinToHero = useCallback(async (q: Question) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await supabase.from('questions').update({ is_daily_hero: false }).neq('id', q.id)
+    await supabase.from('questions').update({ is_daily_hero: false } as any).neq('id', q.id)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await supabase.from('questions').update({ is_daily_hero: true, is_pinned_trending: false }).eq('id', q.id)
+    await supabase.from('questions').update({ is_daily_hero: true, is_pinned_trending: false } as any).eq('id', q.id)
     setTrending(prev => prev.filter(x => x.id !== q.id))
     setPinnedHeroId(q.id)
   }, [supabase])
 
   const unpinHero = useCallback(async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await supabase.from('questions').update({ is_daily_hero: false }).eq('is_daily_hero', true)
+    await supabase.from('questions').update({ is_daily_hero: false } as any).eq('is_daily_hero', true)
     setQuestions(prev => prev.map(x => ({ ...x, is_daily_hero: false })))
     setTrending(prev => prev.map(x => ({ ...x, is_daily_hero: false })))
     setPinnedHeroId(null)
@@ -291,10 +431,9 @@ export default function FeedPage() {
 
   const saveOrder = useCallback(async (ordered: Question[]) => {
     setMainGridOrdered(ordered)
-    const updates = ordered.map((q, i) => ({ id: q.id, sort_order: i }))
-    for (const u of updates) {
+    for (let i = 0; i < ordered.length; i++) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await supabase.from('questions').update({ sort_order: u.sort_order }).eq('id', u.id)
+      await supabase.from('questions').update({ sort_order: i } as any).eq('id', ordered[i].id)
     }
   }, [supabase])
 
@@ -319,11 +458,7 @@ export default function FeedPage() {
         supabase.from('questions').select('total_pool').eq('status', 'open'),
       ])
       const totalPool = (openQs ?? []).reduce((s, q) => s + ((q as { total_pool: number }).total_pool ?? 0), 0)
-      setStats({
-        todayPredictions: todayCount ?? 0,
-        openCount: (openQs ?? []).length,
-        totalPool,
-      })
+      setStats({ todayPredictions: todayCount ?? 0, openCount: (openQs ?? []).length, totalPool })
     }
     loadStats()
 
@@ -331,11 +466,7 @@ export default function FeedPage() {
       .channel('feed-stats-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'predictions' }, (payload) => {
         const amount = (payload.new as { coins_wagered?: number }).coins_wagered ?? 0
-        setStats(prev => prev ? {
-          ...prev,
-          todayPredictions: prev.todayPredictions + 1,
-          totalPool: prev.totalPool + amount,
-        } : prev)
+        setStats(prev => prev ? { ...prev, todayPredictions: prev.todayPredictions + 1, totalPool: prev.totalPool + amount } : prev)
         setTickKey(k => k + 1)
       })
       .subscribe()
@@ -345,7 +476,6 @@ export default function FeedPage() {
 
   useEffect(() => {
     async function loadTrending() {
-      // pinned first
       const { data: pinned } = await supabase
         .from('questions')
         .select('*, categories(name_th, emoji, slug)')
@@ -355,15 +485,10 @@ export default function FeedPage() {
       const pinnedIds = new Set(((pinned ?? []) as Question[]).map(q => q.id))
 
       const since24h = new Date(Date.now() - 86400000).toISOString()
-      const { data: raw } = await supabase
-        .from('predictions')
-        .select('question_id')
-        .gte('placed_at', since24h)
+      const { data: raw } = await supabase.from('predictions').select('question_id').gte('placed_at', since24h)
 
       const counts: Record<string, number> = {}
-      ;(raw ?? [] as { question_id: string }[]).forEach((r: { question_id: string }) => {
-        counts[r.question_id] = (counts[r.question_id] ?? 0) + 1
-      })
+      ;(raw ?? []).forEach((r: { question_id: string }) => { counts[r.question_id] = (counts[r.question_id] ?? 0) + 1 })
 
       const pinnedList: TrendingQuestion[] = ((pinned ?? []) as Question[])
         .filter((q: Question & { is_daily_hero?: boolean }) => !q.is_daily_hero)
@@ -373,7 +498,7 @@ export default function FeedPage() {
         const topIds = Object.entries(counts)
           .sort((a, b) => b[1] - a[1])
           .filter(([id]) => !pinnedIds.has(id))
-          .slice(0, 4 - pinnedList.length)
+          .slice(0, 6 - pinnedList.length)
           .map(([id]) => id)
 
         if (topIds.length > 0) {
@@ -387,9 +512,9 @@ export default function FeedPage() {
             const auto = (qs as Question[])
               .map(q => ({ ...q, recent_count: counts[q.id] ?? 0 }))
               .sort((a, b) => {
-                const aUrgent = new Date(a.closes_at).getTime() < soon ? 1 : 0
-                const bUrgent = new Date(b.closes_at).getTime() < soon ? 1 : 0
-                if (bUrgent !== aUrgent) return bUrgent - aUrgent
+                const aU = new Date(a.closes_at).getTime() < soon ? 1 : 0
+                const bU = new Date(b.closes_at).getTime() < soon ? 1 : 0
+                if (bU !== aU) return bU - aU
                 return b.recent_count - a.recent_count
               })
             setTrending([...pinnedList, ...auto])
@@ -400,17 +525,14 @@ export default function FeedPage() {
 
       if (pinnedList.length > 0) { setTrending(pinnedList); return }
 
-      // fallback: top 4 by predictions in last 24h
       const { data: fallback } = await supabase
         .from('questions')
         .select('*, categories(name_th, emoji, slug)')
         .eq('status', 'open')
         .eq('is_daily_hero', false)
         .order('predictions_count', { ascending: false })
-        .limit(4)
-      if (fallback) {
-        setTrending((fallback as Question[]).map(q => ({ ...q, recent_count: counts[q.id] ?? 0 })))
-      }
+        .limit(6)
+      if (fallback) setTrending((fallback as Question[]).map(q => ({ ...q, recent_count: counts[q.id] ?? 0 })))
     }
     loadTrending()
   }, [])
@@ -419,11 +541,7 @@ export default function FeedPage() {
     async function load() {
       setLoading(true)
 
-      // fetch hidden category slugs
-      const { data: visData } = await supabase
-        .from('category_visibility')
-        .select('slug')
-        .eq('hidden', true)
+      const { data: visData } = await supabase.from('category_visibility').select('slug').eq('hidden', true)
       const hiddenSlugs = (visData ?? []).map(r => r.slug)
 
       let query = supabase
@@ -435,23 +553,14 @@ export default function FeedPage() {
 
       if (category !== 'all') {
         const slugs = PARENT_SUBS[category] ?? [category]
-        const { data: cats } = await supabase
-          .from('categories')
-          .select('id')
-          .in('slug', slugs)
+        const { data: cats } = await supabase.from('categories').select('id').in('slug', slugs)
         const ids = (cats ?? []).map((c: { id: number }) => c.id)
         query = query.in('category_id', ids.length > 0 ? ids : [-1])
       } else if (hiddenSlugs.length > 0) {
-        // exclude hidden categories when showing all
         const allHiddenSlugs = hiddenSlugs.flatMap(s => [s, ...(PARENT_SUBS[s] ?? [])])
-        const { data: hiddenCats } = await supabase
-          .from('categories')
-          .select('id')
-          .in('slug', allHiddenSlugs)
+        const { data: hiddenCats } = await supabase.from('categories').select('id').in('slug', allHiddenSlugs)
         const hiddenIds = (hiddenCats ?? []).map((c: { id: number }) => c.id)
-        if (hiddenIds.length > 0) {
-          query = query.not('category_id', 'in', `(${hiddenIds.join(',')})`)
-        }
+        if (hiddenIds.length > 0) query = query.not('category_id', 'in', `(${hiddenIds.join(',')})`)
       }
 
       const { data } = await query
@@ -473,64 +582,83 @@ export default function FeedPage() {
     return () => { supabase.removeChannel(channel) }
   }, [category])
 
-  const active = questions.filter(q => q.status !== 'resolved' && !(q.status === 'open' && new Date(q.closes_at) <= now))
-  const expired = questions.filter(q => q.status === 'open' && new Date(q.closes_at) <= now)
-  const resolved = questions.filter(q => q.status === 'resolved')
-  const hotIds = new Set(trending.filter(t => t.id !== pinnedHeroId).map(t => t.id))
-  const hotCounts: Record<string, number> = {}
-  trending.forEach(t => { hotCounts[t.id] = t.recent_count })
-
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60_000)
     return () => clearInterval(id)
   }, [])
 
-  // Sync ordered grid when questions/filter changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { setMainGridOrdered([]) }, [category, loading])
 
-  // Hero = admin-pinned only (is_daily_hero); no auto-selection to preserve closes_at sort order
-  const pinnedHero = pinnedHeroId ? active.find(q => q.id === pinnedHeroId) ?? null : null
-  const heroQuestion = pinnedHero
-  const heroId = heroQuestion?.id
+  const active = questions.filter(q => q.status !== 'resolved' && !(q.status === 'open' && new Date(q.closes_at) <= now))
+  const resolved = questions.filter(q => q.status === 'resolved')
+  const hotIds = new Set(trending.filter(t => t.id !== pinnedHeroId).map(t => t.id))
+  const hotCounts: Record<string, number> = {}
+  trending.forEach(t => { hotCounts[t.id] = t.recent_count })
 
-  // Main grid = active minus hero; exclude trending only when trending section is visible (all category)
+  const pinnedHero = pinnedHeroId ? active.find(q => q.id === pinnedHeroId) ?? null : null
+  const heroId = pinnedHero?.id
   const mainGrid = active.filter(q => q.id !== heroId && (category !== 'all' || !hotIds.has(q.id)))
 
+  const activeParent = SUB_TO_PARENT[category] ?? category
+  const hasSidebar = SIDEBAR_PARENTS.has(activeParent)
+  const sidebarGroup = hasSidebar ? ALL_GROUPS.find(g => g.slug === activeParent) : null
+
   return (
-    <div>
+    <div className="max-w-7xl mx-auto">
       <Suspense fallback={null}><ReferralCapture /></Suspense>
-      <CategoryFilter selected={category} onChange={setCategory} />
 
-      {/* Live stats bar */}
-      {stats && (
-        <div className="mx-6 mt-4 mb-1 flex items-center gap-2 overflow-x-auto scrollbar-hide">
-          <span className="flex items-center gap-1 text-[11px] font-semibold text-red-500 bg-red-50 border border-red-100 rounded-full px-2.5 py-1 flex-shrink-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block" />
-            สด
-          </span>
-          <span className="text-[11px] text-gray-500 bg-gray-50 border border-gray-100 rounded-full px-2.5 py-1 flex-shrink-0">
-            👥 <span key={`pred-${tickKey}`} className="font-semibold text-gray-800 inline-block animate-tickUp">{stats.todayPredictions.toLocaleString()}</span> ทายวันนี้
-          </span>
-          <span className="text-[11px] text-gray-500 bg-gray-50 border border-gray-100 rounded-full px-2.5 py-1 flex-shrink-0">
-            🎯 <span className="font-semibold text-gray-800">{stats.openCount}</span> คำถามเปิดอยู่
-          </span>
-          <span className="text-[11px] text-gray-500 bg-gray-50 border border-gray-100 rounded-full px-2.5 py-1 flex-shrink-0">
-            <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[8px] leading-none mr-0.5">P</span>
-            <span key={`pool-${tickKey}`} className="font-semibold text-gray-800 inline-block animate-tickUp">{(stats.totalPool / 1000).toFixed(0)}K</span> คะแนนรวม
-          </span>
+      <div className="px-4 md:px-6 pt-4 pb-8 space-y-6">
+
+        {/* ── Hero banner (all category only) ── */}
+        {category === 'all' && <HeroBanner stats={stats} tickKey={tickKey} />}
+
+        {/* ── Category filter ── */}
+        <div className="-mx-4 md:-mx-6">
+          <CategoryFilter selected={category} onChange={setCategory} />
         </div>
-      )}
 
-      <LiveActivityTicker questions={questions} tickKey={tickKey} />
+        <div className={hasSidebar ? 'flex gap-5 -mt-2' : 'contents'}>
 
-      <div className="px-6 pt-5 pb-6 space-y-8">
+        {/* ── Sidebar sub-nav (desktop, esports/sports only) ── */}
+        {hasSidebar && sidebarGroup && (
+          <aside className="hidden md:block w-44 flex-shrink-0 pt-2">
+            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden sticky top-4">
+              <button
+                onClick={() => setCategory(activeParent)}
+                className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b border-gray-100 transition-colors ${
+                  category === activeParent ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+                }`}
+              >
+                ทั้งหมด
+              </button>
+              {sidebarGroup.subs.map(s => (
+                <button
+                  key={s.slug}
+                  onClick={() => setCategory(s.slug)}
+                  className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium border-b border-gray-100 last:border-0 transition-colors ${
+                    category === s.slug ? 'bg-gray-200 text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+                  }`}
+                >
+                  {s.image
+                    ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={s.image} alt={s.name} className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                    : <span>{s.icon}</span>
+                  }
+                  <span>{s.name}</span>
+                </button>
+              ))}
+            </div>
+          </aside>
+        )}
+
+        <div className={hasSidebar ? 'flex-1 min-w-0 space-y-6 pt-2' : 'contents'}>
+
         {loading ? (
-          <div className="space-y-8">
-            <div className="h-52 bg-white rounded-2xl animate-pulse border border-gray-200" />
+          <div className="space-y-6">
+            <div className="h-48 bg-white rounded-2xl animate-pulse border border-gray-100" />
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="h-44 bg-white rounded-xl animate-pulse border border-gray-200" />
+                <div key={i} className="h-44 bg-white rounded-xl animate-pulse border border-gray-100" />
               ))}
             </div>
           </div>
@@ -541,62 +669,103 @@ export default function FeedPage() {
           </div>
         ) : (
           <>
-
-            {/* ── 🔥 มาแรงตอนนี้ ── */}
+            {/* ── Future Radar (horizontal scroll of trending) ── */}
             {(trending.length > 0 || isAdmin) && category === 'all' && (
-              <TrendingSection
-                trending={trending}
-                isAdmin={isAdmin}
-                trendingDropOver={trendingDropOver}
-                savedIds={savedIds}
-                predictedIds={predictedIds}
-                hotCounts={hotCounts}
-                onDropOver={setTrendingDropOver}
-                onDrop={() => {
+              <section
+                onDragOver={isAdmin ? e => { e.preventDefault(); if (!(e.currentTarget.dataset.dragging)) setTrendingDropOver(true) } : undefined}
+                onDragLeave={isAdmin ? () => setTrendingDropOver(false) : undefined}
+                onDrop={isAdmin ? e => {
+                  e.preventDefault(); setTrendingDropOver(false)
                   const q = draggedQuestionRef.current
                   if (q) { draggedQuestionRef.current = null; pinToTrending(q) }
-                }}
-                onUnpin={unpinFromTrending}
-                onDelete={id => setTrending(prev => prev.filter(x => x.id !== id))}
-                onReorder={saveTrendingOrder}
-                onDragStart={q => { draggedQuestionRef.current = q }}
-              />
+                } : undefined}
+                className={`rounded-2xl transition-all ${isAdmin && trendingDropOver ? 'ring-2 ring-orange-400 bg-orange-50/30 p-2 -m-2' : ''}`}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-500"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                    <h2 className="text-sm font-bold text-gray-900">มาแรง</h2>
+                    <span className="text-xs text-gray-400">ทายสดจากชุมชน</span>
+                    {isAdmin && (
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full transition-colors ${trendingDropOver ? 'text-orange-600 bg-orange-100' : 'text-orange-400 bg-orange-50'}`}>
+                        {trendingDropOver ? '↓ วางที่นี่' : '⠿ ลากมาปักหมุด'}
+                      </span>
+                    )}
+                  </div>
+                  <Link href="/leaderboard" className="text-xs text-indigo-600 font-semibold flex items-center gap-0.5 hover:text-indigo-800">
+                    ดูทั้งหมด <ArrowRight size={12} />
+                  </Link>
+                </div>
+
+                <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none -mx-4 md:-mx-6 px-4 md:px-6">
+                  {trending.map((q, i) => (
+                    <div
+                      key={q.id}
+                      draggable={isAdmin}
+                      onDragStart={() => { draggedQuestionRef.current = q }}
+                      onDragEnd={() => { draggedQuestionRef.current = null }}
+                      className="animate-fadeInUp flex-shrink-0"
+                      style={{ animationDelay: `${i * 40}ms` }}
+                    >
+                      {isAdmin && (q as Question & { is_pinned_trending?: boolean }).is_pinned_trending && (
+                        <div className="flex justify-end mb-1">
+                          <button
+                            onClick={() => unpinFromTrending(q.id)}
+                            className="bg-orange-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full hover:bg-orange-600 transition-colors"
+                          >
+                            📌 unpin
+                          </button>
+                        </div>
+                      )}
+                      <FutureRadarCard
+                        question={q}
+                        isHot={hotIds.has(q.id)}
+                        recentCount={q.recent_count}
+                        savedIds={savedIds}
+                        predictedIds={predictedIds}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </section>
             )}
 
-            {/* ── 👥 คนกำลังทาย (+ daily hero) ── */}
-            {(heroQuestion || mainGrid.length > 0) && (
+            {/* ── Top Predictors + Market Overview (2-col on desktop) ── */}
+            {category === 'all' && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <TopPredictorsRow />
+                <MarketOverview stats={stats} />
+              </div>
+            )}
+
+            {/* ── All questions grid ── */}
+            {(pinnedHero || mainGrid.length > 0) && (
               <section
-                onDragOver={isAdmin ? e => { e.preventDefault(); setHeroDropOver(true) } : undefined}
-                onDragLeave={isAdmin ? () => setHeroDropOver(false) : undefined}
+                onDragOver={isAdmin ? e => { e.preventDefault() } : undefined}
                 onDrop={isAdmin ? e => {
-                  e.preventDefault(); setHeroDropOver(false)
+                  e.preventDefault()
                   const q = draggedQuestionRef.current
                   if (q) { draggedQuestionRef.current = null; pinToHero(q) }
                 } : undefined}
               >
                 <div className="flex items-center gap-2 mb-3">
                   <Users size={16} className="text-gray-500" />
-                  <h2 className="text-sm font-bold text-gray-900">คนกำลังทาย</h2>
+                  <h2 className="text-sm font-bold text-gray-900">
+                    {category === 'all' ? 'คนกำลังทาย' : 'ในหมวดนี้'}
+                  </h2>
                   <span className="text-[11px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{active.length} คำถาม</span>
                   {isAdmin && pinnedHeroId && (
                     <button onClick={unpinHero} className="text-[10px] text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full hover:bg-indigo-100 transition-colors">
                       📌 unpin คำถามประจำวัน
                     </button>
                   )}
-                  {isAdmin && (
-                    <span className={[
-                      'text-[10px] px-2 py-0.5 rounded-full transition-colors',
-                      heroDropOver ? 'text-yellow-600 bg-yellow-100' : 'text-indigo-400 bg-indigo-50',
-                    ].join(' ')}>
-                      {heroDropOver ? '↓ ตั้งเป็นคำถามประจำวัน' : '⠿ ลากการ์ดมาวางเพื่อตั้งเป็นคำถามประจำวัน'}
-                    </span>
-                  )}
+                  {isAdmin && <span className="text-[10px] text-indigo-400 bg-indigo-50 px-2 py-0.5 rounded-full">⠿ ลากมาวางเพื่อตั้งเป็นคำถามประจำวัน</span>}
                 </div>
 
                 <DraggableGrid
                   items={(() => {
                     const base = (mainGridOrdered.length > 0 ? mainGridOrdered : mainGrid).filter(q => q.id !== heroId)
-                    return heroQuestion ? [heroQuestion, ...base] : base
+                    return pinnedHero ? [pinnedHero, ...base] : base
                   })()}
                   isAdmin={isAdmin}
                   savedIds={savedIds}
@@ -611,30 +780,7 @@ export default function FeedPage() {
               </section>
             )}
 
-            {/* Expired — waiting for admin to resolve */}
-            {expired.length > 0 && (
-              <section className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-semibold text-gray-500">รอเฉลย</h2>
-                  <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{expired.length}</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 opacity-60">
-                  {expired.map((q, i) => (
-                    <div key={q.id} className="animate-fadeInUp" style={{ animationDelay: `${i * 40}ms` }}>
-                      <QuestionCard
-                        question={q}
-                        isAdmin={isAdmin}
-                        initialSaved={savedIds.has(q.id)}
-                        isPredicted={predictedIds.has(q.id)}
-                        onDelete={id => setQuestions(prev => prev.filter(x => x.id !== id))}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Resolved questions */}
+            {/* Resolved */}
             {resolved.length > 0 && (
               <section className="space-y-3">
                 <div className="flex items-center gap-2">
@@ -658,8 +804,11 @@ export default function FeedPage() {
             )}
           </>
         )}
+
+        </div>{/* end flex-1 content */}
+        </div>{/* end hasSidebar flex wrapper */}
       </div>
-      <TopPredictors category={category} />
+
     </div>
   )
 }

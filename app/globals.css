@@ -75,3 +75,18 @@ body {
 .animate-cosmic {
   animation: cosmic 4s linear infinite;
 }
+
+@keyframes ticker-scroll-y {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-50%); }
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.7); }
+}
+.ticker-track-y {
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+  animation: ticker-scroll-y linear infinite;
+}

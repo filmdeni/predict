@@ -1,5 +1,6 @@
 import Header from '@/components/layout/Header'
 import BottomNav from '@/components/layout/BottomNav'
+import Sidebar from '@/components/layout/Sidebar'
 import DailyBonusProvider from '@/components/layout/DailyBonusProvider'
 import ResolvedRewardPopup from '@/components/layout/ResolvedRewardPopup'
 import ToastContainer from '@/components/ui/Toast'
@@ -7,13 +8,25 @@ import HowToPlayModal from '@/components/layout/HowToPlayModal'
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col min-h-screen bg-[#f5f5f5]">
+    <div className="min-h-screen bg-[#f5f5f5]">
       <DailyBonusProvider />
       <ResolvedRewardPopup />
       <HowToPlayModal />
-      <Header />
-      <main className="flex-1 pb-20 max-w-7xl mx-auto w-full">{children}</main>
-      <BottomNav />
+
+      {/* Sidebar — desktop only */}
+      <Sidebar />
+
+      {/* Main content — offset by sidebar on desktop */}
+      <div className="flex flex-col min-h-screen md:pl-56">
+        <Header />
+        <main className="flex-1 pb-20 md:pb-6">{children}</main>
+      </div>
+
+      {/* Bottom nav — mobile only */}
+      <div className="md:hidden">
+        <BottomNav />
+      </div>
+
       <ToastContainer />
     </div>
   )

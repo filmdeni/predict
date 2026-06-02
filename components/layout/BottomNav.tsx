@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Trophy, User, PlusCircle } from 'lucide-react'
+import { Home, Trophy, User, PlusCircle, Clock } from 'lucide-react'
 
 const LINKS = [
   { href: '/feed',        icon: Home,       label: 'ฟีด' },
   { href: '/leaderboard', icon: Trophy,     label: 'อันดับ' },
   { href: '/submit',      icon: PlusCircle, label: 'ตั้งคำถาม' },
+  { href: '/pending',     icon: Clock,      label: 'รอเฉลย' },
   { href: '/profile/me',  icon: User,       label: 'โปรไฟล์' },
 ]
 

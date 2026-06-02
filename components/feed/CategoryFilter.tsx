@@ -1,11 +1,25 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { Globe, Landmark, TrendingUp, Users, Star, Gamepad2, Trophy, Bitcoin } from 'lucide-react'
 
 export const PARENT_SUBS: Record<string, string[]> = {
   esports: ['esports', 'dota2', 'cs2', 'mlbb', 'valorant', 'lol'],
-  sports:  ['sports', 'football', 'boxing', 'nba'],
+  sports:  ['sports', 'football', 'boxing', 'nba', 'mlb'],
+}
+
+export const SIDEBAR_PARENTS = new Set(['esports', 'sports'])
+
+const CATEGORY_ICONS: Record<string, React.ReactNode> = {
+  all:      <Globe     size={14} strokeWidth={1.75} />,
+  politics: <Landmark  size={14} strokeWidth={1.75} />,
+  crypto:   <Bitcoin   size={14} strokeWidth={1.75} />,
+  drama:    <Users     size={14} strokeWidth={1.75} />,
+  stock:    <TrendingUp size={14} strokeWidth={1.75} />,
+  viral:    <Star      size={14} strokeWidth={1.75} />,
+  esports:  <Gamepad2  size={14} strokeWidth={1.75} />,
+  sports:   <Trophy    size={14} strokeWidth={1.75} />,
 }
 
 export const ALL_GROUPS = [
@@ -33,11 +47,11 @@ export const ALL_GROUPS = [
       { slug: 'football', name: 'ฟุตบอล', icon: '⚽', image: undefined },
       { slug: 'boxing',   name: 'มวย',    icon: '🥊', image: undefined },
       { slug: 'nba',      name: 'NBA',     icon: '🏀', image: undefined },
+      { slug: 'mlb',      name: 'MLB',     icon: '⚾', image: undefined },
     ],
   },
 ]
 
-// ย้อนหา parent จาก sub-slug
 export const SUB_TO_PARENT: Record<string, string> = {}
 for (const g of ALL_GROUPS) {
   for (const s of g.subs) SUB_TO_PARENT[s.slug] = g.slug
@@ -46,10 +60,9 @@ for (const g of ALL_GROUPS) {
 interface Props {
   selected: string
   onChange: (slug: string) => void
-  hideSubs?: boolean
 }
 
-export default function CategoryFilter({ selected, onChange, hideSubs = false }: Props) {
+export default function CategoryFilter({ selected, onChange }: Props) {
   const [hiddenSlugs, setHiddenSlugs] = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -64,9 +77,10 @@ export default function CategoryFilter({ selected, onChange, hideSubs = false }:
   }, [])
 
   const GROUPS = ALL_GROUPS.filter(g => !hiddenSlugs.has(g.slug))
+
   const activeParent = SUB_TO_PARENT[selected] ?? selected
   const activeGroup = GROUPS.find(g => g.slug === activeParent)
-  const hasSubs = (activeGroup?.subs?.length ?? 0) > 0
+  const hasSubs = (activeGroup?.subs.length ?? 0) > 0
 
   return (
     <div className="border-b border-gray-200 bg-white">
@@ -77,25 +91,32 @@ export default function CategoryFilter({ selected, onChange, hideSubs = false }:
           return (
             <button
               key={g.slug}
-              onClick={() => onChange(g.slug)}
-              className={`flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+              onClick={() => {
+                if (g.subs.length > 0) {
+                  onChange(g.subs[0].slug)
+                } else {
+                  onChange(g.slug)
+                }
+              }}
+              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
                 isActive
                   ? 'bg-gray-900 text-white'
                   : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-400 hover:text-gray-900'
               }`}
             >
+              {CATEGORY_ICONS[g.slug]}
               {g.name}
               {g.subs.length > 0 && (
-                <span className={`text-[10px] ${isActive ? 'text-gray-300' : 'text-gray-400'}`}>▾</span>
+                <span className="text-[10px] opacity-50">▾</span>
               )}
             </button>
           )
         })}
       </div>
 
-      {/* Row 2 — sub-categories (hidden when sidebar is shown) */}
-      {!hideSubs && hasSubs && activeGroup && (
-        <div className="flex gap-1.5 overflow-x-auto px-6 py-2 scrollbar-none bg-gray-50 border-t border-gray-100">
+      {/* Row 2 — sub-categories (mobile only for esports/sports; desktop uses sidebar) */}
+      {hasSubs && activeGroup && (
+        <div className={`flex gap-1.5 overflow-x-auto px-6 py-2 scrollbar-none bg-gray-50 border-t border-gray-100${SIDEBAR_PARENTS.has(activeParent) ? ' md:hidden' : ''}`}>
           <button
             onClick={() => onChange(activeParent)}
             className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-all border ${
