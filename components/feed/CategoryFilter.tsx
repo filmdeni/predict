@@ -19,20 +19,20 @@ const ALL_GROUPS = [
     slug: 'esports',
     name: 'eSports',
     subs: [
-      { slug: 'dota2',    name: 'Dota 2',   icon: '🔴' },
-      { slug: 'cs2',      name: 'CS2',      icon: '🔫' },
-      { slug: 'valorant', name: 'Valorant', icon: '🎯' },
-      { slug: 'lol',      name: 'LoL',      icon: '⚡' },
-      { slug: 'mlbb',     name: 'MLBB',     icon: '⚔️' },
+      { slug: 'dota2',    name: 'Dota 2',   icon: '🔴', image: 'https://cdn.akamai.steamstatic.com/steam/apps/570/capsule_sm_120.jpg' },
+      { slug: 'cs2',      name: 'CS2',      icon: '🔫', image: 'https://cdn.akamai.steamstatic.com/steam/apps/730/capsule_sm_120.jpg' },
+      { slug: 'valorant', name: 'Valorant', icon: '🎯', image: '/images/valorant.png' },
+      { slug: 'lol',      name: 'LoL',      icon: '⚡', image: '/images/lol.png' },
+      { slug: 'mlbb',     name: 'MLBB',     icon: '⚔️', image: '/images/mlbb.png' },
     ],
   },
   {
     slug: 'sports',
     name: 'กีฬา',
     subs: [
-      { slug: 'football', name: 'ฟุตบอล', icon: '⚽' },
-      { slug: 'boxing',   name: 'มวย',    icon: '🥊' },
-      { slug: 'nba',      name: 'NBA',     icon: '🏀' },
+      { slug: 'football', name: 'ฟุตบอล', icon: '⚽', image: undefined },
+      { slug: 'boxing',   name: 'มวย',    icon: '🥊', image: undefined },
+      { slug: 'nba',      name: 'NBA',     icon: '🏀', image: undefined },
     ],
   },
 ]
@@ -122,7 +122,10 @@ export default function CategoryFilter({ selected, onChange }: Props) {
                   : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
               }`}
             >
-              {s.icon} {s.name}
+              {s.image
+                ? <img src={s.image} alt={s.name} className="w-4 h-4 rounded object-cover flex-shrink-0" />
+                : <span>{s.icon}</span>
+              } {s.name}
             </button>
           ))}
         </div>
