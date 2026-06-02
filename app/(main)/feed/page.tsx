@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { TrendingUp, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getPoolShares } from '@/lib/game/odds'
 import QuestionCard from '@/components/feed/QuestionCard'
@@ -152,7 +153,7 @@ function TrendingSection({
       ].join(' ')}
     >
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-base">🔥</span>
+        <TrendingUp size={16} className="text-orange-500" />
         <h2 className="text-sm font-bold text-gray-900">มาแรงตอนนี้</h2>
         {trending.length > 0 && (
           <span className="text-[11px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
@@ -429,8 +430,7 @@ export default function FeedPage() {
         .from('questions')
         .select('*, categories(name_th, emoji, slug)')
         .in('status', ['open', 'closed', 'resolved'])
-        .order('sort_order', { ascending: true, nullsFirst: false })
-        .order('created_at', { ascending: false })
+        .order('closes_at', { ascending: true })
         .limit(50)
 
       if (category !== 'all') {
@@ -489,13 +489,9 @@ export default function FeedPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { setMainGridOrdered([]) }, [category, loading])
 
-  // Hero = pinned (is_daily_hero) if set, else auto-select most popular non-trending
+  // Hero = admin-pinned only (is_daily_hero); no auto-selection to preserve closes_at sort order
   const pinnedHero = pinnedHeroId ? active.find(q => q.id === pinnedHeroId) ?? null : null
-  const heroCandidates = active.filter(q => !hotIds.has(q.id))
-  const autoHero = heroCandidates.length > 0
-    ? heroCandidates.reduce((a, b) => b.predictions_count > a.predictions_count ? b : a)
-    : active[0] ?? null
-  const heroQuestion = pinnedHero ?? autoHero
+  const heroQuestion = pinnedHero
   const heroId = heroQuestion?.id
 
   // Main grid = active minus hero; exclude trending only when trending section is visible (all category)
@@ -579,7 +575,7 @@ export default function FeedPage() {
                 } : undefined}
               >
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-base">👥</span>
+                  <Users size={16} className="text-gray-500" />
                   <h2 className="text-sm font-bold text-gray-900">คนกำลังทาย</h2>
                   <span className="text-[11px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{active.length} คำถาม</span>
                   {isAdmin && pinnedHeroId && (
