@@ -24,6 +24,7 @@ const LEAGUES = [
   { slug: 'ita.1',   name: 'Serie A',             category_id: 22 },
   { slug: 'uefa.champions_league', name: 'UCL',   category_id: 22 },
   { slug: 'nba',     name: 'NBA',                 category_id: 24, sport: 'basketball' },
+  { slug: 'ufc',     name: 'UFC',                 category_id: 23, sport: 'mma' },
 ]
 
 interface ESPNTeam {
@@ -49,6 +50,34 @@ async function fetchEvents(league: typeof LEAGUES[number]): Promise<ESPNEvent[]>
   )
   if (!res.ok) throw new Error(`ESPN error: ${res.status}`)
   const data = await res.json()
+
+  // MMA: flatten individual fights from competitions[]
+  if (sport === 'mma') {
+    const events: ESPNEvent[] = []
+    for (const ev of data.events ?? []) {
+      for (const comp of ev.competitions ?? []) {
+        const fighters = (comp.competitors ?? []).map((c: any) => ({
+          team: {
+            id: c.athlete?.id ?? c.id,
+            displayName: c.athlete?.displayName ?? c.id,
+            logo: c.athlete?.flag?.href ?? null,
+          },
+          homeAway: c.order === 1 ? 'home' : 'away',
+          winner: c.winner,
+          score: c.score,
+        }))
+        if (fighters.length === 2) {
+          events.push({
+            id: comp.id,
+            date: comp.date ?? ev.date,
+            competitions: [{ status: comp.status, competitors: fighters }],
+          })
+        }
+      }
+    }
+    return events
+  }
+
   return data.events ?? []
 }
 
@@ -61,19 +90,21 @@ async function alreadySeeded(eventId: string): Promise<boolean> {
   return (data?.length ?? 0) > 0
 }
 
-async function seedMockPredictions(questionId: string, optA: string, optB: string, optDraw: string) {
-  const opts = [optA, optB, optDraw]
+async function seedMockPredictions(questionId: string, optA: string, optB: string, optDraw: string | null) {
   const bets = BOT_USER_IDS.map((userId, i) => {
     const r = Math.random()
-    return {
-      question_id: questionId,
-      user_id: userId,
-      option_id: r < 0.45 ? optA : r < 0.80 ? optB : optDraw,
-      coins_wagered: BOT_WAGERS[i],
+    let option_id: string
+    if (optDraw) {
+      option_id = r < 0.45 ? optA : r < 0.80 ? optB : optDraw
+    } else {
+      option_id = r < 0.5 ? optA : optB
     }
+    return { question_id: questionId, user_id: userId, option_id, coins_wagered: BOT_WAGERS[i] }
   })
 
-  const pool: Record<string, number> = { [optA]: 0, [optB]: 0, [optDraw]: 0 }
+  const pool: Record<string, number> = optDraw
+    ? { [optA]: 0, [optB]: 0, [optDraw]: 0 }
+    : { [optA]: 0, [optB]: 0 }
   bets.forEach(b => { pool[b.option_id] = (pool[b.option_id] ?? 0) + b.coins_wagered })
   const total = Object.values(pool).reduce((s, v) => s + v, 0)
 
@@ -115,11 +146,23 @@ async function handler(req: Request) {
 
         const comp = event.competitions[0]
         const [teamA, teamB] = comp.competitors
-        const optA   = teamA.team.id
-        const optB   = teamB.team.id
+        const optA    = teamA.team.id
+        const optB    = teamB.team.id
+        const isMMA   = league.sport === 'mma'
         const optDraw = 'draw'
 
-        const closesAt = new Date(new Date(event.date).getTime() + 2.5 * 60 * 60 * 1000)
+        const closesAt = new Date(new Date(event.date).getTime() + (isMMA ? 4 : 2.5) * 60 * 60 * 1000)
+
+        const options = isMMA
+          ? [
+              { id: optA, label: teamA.team.displayName, icon_url: teamA.team.logo ?? null },
+              { id: optB, label: teamB.team.displayName, icon_url: teamB.team.logo ?? null },
+            ]
+          : [
+              { id: optA,    label: teamA.team.displayName, icon_url: teamA.team.logo ?? null },
+              { id: optB,    label: teamB.team.displayName, icon_url: teamB.team.logo ?? null },
+              { id: optDraw, label: 'เสมอ' },
+            ]
 
         const { data: q, error } = await supabase.from('questions').insert({
           category_id: league.category_id,
@@ -133,17 +176,13 @@ async function handler(req: Request) {
             team_a: { id: optA, name: teamA.team.displayName },
             team_b: { id: optB, name: teamB.team.displayName },
           }),
-          options: [
-            { id: optA,   label: teamA.team.displayName, icon_url: teamA.team.logo ?? null },
-            { id: optB,   label: teamB.team.displayName, icon_url: teamB.team.logo ?? null },
-            { id: optDraw, label: 'เสมอ' },
-          ],
+          options,
           closes_at: closesAt.toISOString(),
           card_style: 'bars',
         }).select('id').single()
 
         if (error) throw error
-        await seedMockPredictions(q.id, optA, optB, optDraw)
+        await seedMockPredictions(q.id, optA, optB, isMMA ? null : optDraw)
         results.push({ event_id: event.id, question_id: q.id, league: league.slug, match: `${teamA.team.displayName} vs ${teamB.team.displayName}` })
       }
     } catch (err) {
