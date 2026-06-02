@@ -16,15 +16,15 @@ const BOT_USER_IDS = [
 const BOT_WAGERS = [80, 120, 60, 100, 150]
 
 const LEAGUES = [
-  { slug: 'eng.1',   name: 'Premier League',     category_id: 22 },
-  { slug: 'esp.1',   name: 'La Liga',             category_id: 22 },
-  { slug: 'tha.1',   name: 'ไทยลีก',              category_id: 22 },
-  { slug: 'fra.1',   name: 'Ligue 1',             category_id: 22 },
-  { slug: 'ger.1',   name: 'Bundesliga',          category_id: 22 },
-  { slug: 'ita.1',   name: 'Serie A',             category_id: 22 },
-  { slug: 'uefa.champions_league', name: 'UCL',   category_id: 22 },
-  { slug: 'nba',     name: 'NBA',                 category_id: 24, sport: 'basketball' },
-  { slug: 'ufc',     name: 'UFC',                 category_id: 23, sport: 'mma' },
+  { slug: 'eng.1',   name: 'Premier League', category_id: 22, image: 'https://a.espncdn.com/i/teamlogos/leagues/500/eng.1.png' },
+  { slug: 'esp.1',   name: 'La Liga',        category_id: 22, image: 'https://a.espncdn.com/i/teamlogos/leagues/500/esp.1.png' },
+  { slug: 'tha.1',   name: 'ไทยลีก',         category_id: 22, image: 'https://a.espncdn.com/i/teamlogos/leagues/500/tha.1.png' },
+  { slug: 'fra.1',   name: 'Ligue 1',        category_id: 22, image: 'https://a.espncdn.com/i/teamlogos/leagues/500/fra.1.png' },
+  { slug: 'ger.1',   name: 'Bundesliga',     category_id: 22, image: 'https://a.espncdn.com/i/teamlogos/leagues/500/ger.1.png' },
+  { slug: 'ita.1',   name: 'Serie A',        category_id: 22, image: 'https://a.espncdn.com/i/teamlogos/leagues/500/ita.1.png' },
+  { slug: 'uefa.champions_league', name: 'UCL', category_id: 22, image: 'https://a.espncdn.com/i/teamlogos/leagues/500/uefa.champions_league.png' },
+  { slug: 'nba',     name: 'NBA',            category_id: 24, sport: 'basketball', image: 'https://a.espncdn.com/i/teamlogos/leagues/500/nba.png' },
+  { slug: 'ufc',     name: 'UFC',            category_id: 23, sport: 'mma',        image: 'https://a.espncdn.com/i/teamlogos/leagues/500/ufc.png' },
 ]
 
 interface ESPNTeam {
@@ -176,6 +176,7 @@ async function handler(req: Request) {
             team_a: { id: optA, name: teamA.team.displayName },
             team_b: { id: optB, name: teamB.team.displayName },
           }),
+          image_url: league.image ?? null,
           options,
           closes_at: closesAt.toISOString(),
           card_style: 'bars',
