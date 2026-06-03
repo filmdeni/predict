@@ -93,15 +93,6 @@ export default function ResolvedRewardPopup() {
 
   return (
     <>
-      {!reward && (
-        <button
-          onClick={showMock}
-          className="fixed bottom-44 right-4 z-40 bg-indigo-600 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-lg hover:bg-indigo-700 transition-colors"
-        >
-          🧪 Mock Reward
-        </button>
-      )}
-
       {reward && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-0 sm:p-4" onClick={() => setReward(null)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
