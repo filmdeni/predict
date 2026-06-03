@@ -357,32 +357,3 @@ export default function RewardClaimFX() {
   return null
 }
 
-export function RewardClaimDevButtons() {
-  const claimRef = useRef<HTMLButtonElement>(null)
-  const bellRef = useRef<HTMLButtonElement>(null)
-  // show in all envs for manual testing
-  return (
-    <div className="fixed bottom-24 right-4 z-50 flex flex-col gap-2">
-      <button
-        ref={claimRef}
-        onClick={() => claimRef.current && triggerRewardClaim(claimRef.current, 1240)}
-        className="bg-amber-500 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-lg hover:bg-amber-600 transition-colors"
-      >
-        💰 ทดสอบ Claim FX
-      </button>
-      <button
-        ref={bellRef}
-        onClick={() => {
-          playPredictionSound()
-          if (bellRef.current) {
-            const rect = bellRef.current.getBoundingClientRect()
-            triggerBellPing(rect)
-          }
-        }}
-        className="bg-indigo-500 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-lg hover:bg-indigo-600 transition-colors"
-      >
-        🔔 ทดสอบ Bell Ping
-      </button>
-    </div>
-  )
-}

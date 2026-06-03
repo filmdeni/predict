@@ -5,7 +5,7 @@ import Sidebar from '@/components/layout/Sidebar'
 import SidebarPriceTicker from '@/components/layout/SidebarPriceTicker'
 import DailyBonusProvider from '@/components/layout/DailyBonusProvider'
 import ResolvedRewardPopup from '@/components/layout/ResolvedRewardPopup'
-import RewardClaimFX, { RewardClaimDevButtons } from '@/components/layout/RewardClaimFX'
+import RewardClaimFX from '@/components/layout/RewardClaimFX'
 import ToastContainer from '@/components/ui/Toast'
 import HowToPlayModal from '@/components/layout/HowToPlayModal'
 import TermsModal from '@/components/layout/TermsModal'
@@ -17,7 +17,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       <DailyBonusProvider />
       <ResolvedRewardPopup />
       <RewardClaimFX />
-      <RewardClaimDevButtons />
       <HowToPlayModal />
 
       {/* Sidebar — desktop only */}
