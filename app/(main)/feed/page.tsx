@@ -360,7 +360,15 @@ function ReferralCapture() {
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
-export default function FeedPage() {
+export default function FeedPageWrapper() {
+  return (
+    <Suspense fallback={null}>
+      <FeedPage />
+    </Suspense>
+  )
+}
+
+function FeedPage() {
   const searchParamsFeed = useSearchParams()
   const router = useRouter()
   const [questions, setQuestions] = useState<Question[]>([])
