@@ -44,6 +44,37 @@ async function fetchOilWTI(): Promise<number> {
   return data.chart.result[0].meta.regularMarketPrice as number
 }
 
+interface ThaiOilPrices {
+  diesel: number   // ดีเซล B7
+  gasohol95: number // แก๊สโซฮอล 95 E10
+}
+
+async function fetchThaiOilPrices(): Promise<ThaiOilPrices> {
+  // PTT embeds a JS variable `latestFallbackPrices` with all current retail prices
+  const res = await fetch('https://www.pttor.com/th/oil-price', {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept-Language': 'th,en;q=0.9',
+    },
+    next: { revalidate: 0 },
+  })
+  if (!res.ok) throw new Error(`PTT fetch error: ${res.status}`)
+  const html = await res.text()
+
+  const match = html.match(/latestFallbackPrices\s*=\s*(\{.+?\});/)
+  if (!match) throw new Error('Cannot find latestFallbackPrices in PTT page')
+
+  const prices: Record<string, { price: number }> = JSON.parse(match[1])
+
+  // "ดีเซล" = Diesel B7 (standard diesel, most-used), "เบนซินแก๊สโซฮอล์ 95" = Gasohol 95
+  const diesel = prices['ดีเซล']?.price
+  const gasohol95 = prices['เบนซินแก๊สโซฮอล์ 95']?.price
+
+  if (!diesel || !gasohol95) throw new Error('Missing price keys in PTT data')
+
+  return { diesel, gasohol95 }
+}
+
 function roundToStep(value: number, step: number): number {
   return Math.round(value / step) * step
 }
@@ -246,6 +277,89 @@ async function handler(req: Request) {
     }
   } catch (err) {
     results.push({ type: 'oil', error: String(err) })
+  }
+
+  // ---- Thai Oil (Diesel B7 + Gasohol 95) ----
+  // PTT announces new prices daily at midnight Bangkok time
+  // question closes next midnight Bangkok (17:00 UTC)
+  try {
+    const [dieselDone, gasohol95Done] = await Promise.all([
+      alreadySeededToday('oil_diesel_th'),
+      alreadySeededToday('oil_gasohol95_th'),
+    ])
+
+    if (dieselDone && gasohol95Done) {
+      results.push({ type: 'thai_oil', skipped: 'already seeded today' })
+    } else {
+      const thaiOil = await fetchThaiOilPrices()
+
+      // closes next midnight Bangkok = 17:00 UTC today
+      const oilClosesAt = new Date(now)
+      oilClosesAt.setUTCHours(17, 0, 0, 0)
+      if (oilClosesAt <= now) oilClosesAt.setUTCDate(oilClosesAt.getUTCDate() + 1)
+
+      // Diesel B7
+      if (!dieselDone) {
+        const dieselThreshold = roundToStep(thaiOil.diesel, 0.5)
+        const { data: qd, error: ed } = await supabase
+          .from('questions')
+          .insert({
+            category_id: 3,
+            created_by: BOT_USER_IDS[2],
+            title: `ดีเซล B7 ${dateLabel} ราคาจะสูงกว่า ${dieselThreshold.toFixed(2)} บาท/ลิตร ไหม?`,
+            description: JSON.stringify({
+              type: 'commodity', commodity: 'oil_diesel_th',
+              threshold: dieselThreshold, unit: 'บาท/ลิตร', seed_price: thaiOil.diesel,
+              source: 'ptt',
+            }),
+            image_url: 'https://www.google.com/s2/favicons?sz=64&domain=pttor.com',
+            options: [
+              { id: 'yes', label: `ใช่ สูงกว่า ${dieselThreshold.toFixed(2)} บาท` },
+              { id: 'no',  label: `ไม่ถึง ${dieselThreshold.toFixed(2)} บาท` },
+            ],
+            closes_at: oilClosesAt.toISOString(),
+            card_style: 'gauge',
+          })
+          .select('id')
+          .single()
+
+        if (ed) throw ed
+        await seedMockPredictions(qd.id, thaiOil.diesel, dieselThreshold)
+        results.push({ type: 'oil_diesel_th', question_id: qd.id, price: thaiOil.diesel, threshold: dieselThreshold })
+      }
+
+      // Gasohol 95 E10
+      if (!gasohol95Done) {
+        const g95Threshold = roundToStep(thaiOil.gasohol95, 0.5)
+        const { data: qg, error: eg } = await supabase
+          .from('questions')
+          .insert({
+            category_id: 3,
+            created_by: BOT_USER_IDS[3],
+            title: `แก๊สโซฮอล 95 ${dateLabel} ราคาจะสูงกว่า ${g95Threshold.toFixed(2)} บาท/ลิตร ไหม?`,
+            description: JSON.stringify({
+              type: 'commodity', commodity: 'oil_gasohol95_th',
+              threshold: g95Threshold, unit: 'บาท/ลิตร', seed_price: thaiOil.gasohol95,
+              source: 'ptt',
+            }),
+            image_url: 'https://www.google.com/s2/favicons?sz=64&domain=pttor.com',
+            options: [
+              { id: 'yes', label: `ใช่ สูงกว่า ${g95Threshold.toFixed(2)} บาท` },
+              { id: 'no',  label: `ไม่ถึง ${g95Threshold.toFixed(2)} บาท` },
+            ],
+            closes_at: oilClosesAt.toISOString(),
+            card_style: 'gauge',
+          })
+          .select('id')
+          .single()
+
+        if (eg) throw eg
+        await seedMockPredictions(qg.id, thaiOil.gasohol95, g95Threshold)
+        results.push({ type: 'oil_gasohol95_th', question_id: qg.id, price: thaiOil.gasohol95, threshold: g95Threshold })
+      }
+    }
+  } catch (err) {
+    results.push({ type: 'thai_oil', error: String(err) })
   }
 
   // ---- US Stocks ----

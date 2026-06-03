@@ -3,18 +3,17 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { Home, Clock, Trophy, User, PlusCircle, HelpCircle } from 'lucide-react'
+import { Home, Trophy, Clock, PlusCircle, HelpCircle, LogOut, ChevronDown, ChevronUp } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { RANKS } from '@/lib/game/ranks'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
+import type { ReactNode } from 'react'
+import WeatherCard from './WeatherCard'
 
 const NAV_LINKS = [
-  { href: '/feed',        icon: Home,       label: 'หน้าหลัก' },
-  { href: '/leaderboard', icon: Trophy,     label: 'อันดับ' },
-  { href: '/submit',      icon: PlusCircle, label: 'ตั้งคำถาม' },
-  { href: '/pending',     icon: Clock,      label: 'รอเฉลย' },
-  { href: '/profile/me',  icon: User,       label: 'โปรไฟล์' },
-  { href: '/how-to-play', icon: HelpCircle, label: 'วิธีเล่น' },
+  { href: '/feed',        icon: Home,   label: 'หน้าหลัก' },
+  { href: '/leaderboard', icon: Trophy, label: 'อันดับ' },
+  { href: '/pending',     icon: Clock,  label: 'รอเฉลย' },
 ]
 
 type Profile = {
@@ -25,10 +24,11 @@ type Profile = {
   total_predictions: number
 }
 
-export default function Sidebar() {
+export default function Sidebar({ priceTicker }: { priceTicker?: ReactNode }) {
   const pathname = usePathname()
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [showWidgets, setShowWidgets] = useState(true)
 
   const supabase = createClient()
 
@@ -45,14 +45,13 @@ export default function Sidebar() {
     })
   }, [])
 
-  const rankData = RANKS.find(r => r.tier === profile?.rank) ?? RANKS[0]
-  const accuracy =
-    profile && profile.total_predictions > 0
-      ? Math.round((profile.correct_predictions / profile.total_predictions) * 100)
-      : 0
+  const rankInfo = profile ? RANKS.find(r => r.tier === profile.rank) : null
+  const accuracy = profile && profile.total_predictions > 0
+    ? Math.round((profile.correct_predictions / profile.total_predictions) * 100)
+    : null
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-56 bg-white border-r border-gray-100 flex-col z-30 hidden md:flex">
+    <aside className="fixed left-0 top-0 bottom-0 w-56 bg-white border-r border-gray-100 flex flex-col z-30 hidden md:flex">
       {/* Logo */}
       <div className="px-5 py-4 flex-shrink-0">
         <Link href="/feed" className="flex flex-col">
@@ -64,9 +63,11 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
-        {NAV_LINKS.map(({ href, icon: Icon, label }) => {
-          const active = href === '/feed' ? pathname === href || pathname.startsWith('/feed') : pathname.startsWith(href)
+      <nav className="px-3 space-y-0.5 flex-shrink-0">
+        {[...NAV_LINKS, { href: '/submit', icon: PlusCircle, label: 'ตั้งคำถาม' }, { href: '/how-to-play', icon: HelpCircle, label: 'วิธีเล่น' }].map(({ href, icon: Icon, label }) => {
+          const active = href === '/feed'
+            ? pathname === href || pathname.startsWith('/feed')
+            : pathname.startsWith(href)
           return (
             <Link
               key={href}
@@ -83,60 +84,67 @@ export default function Sidebar() {
             </Link>
           )
         })}
-
       </nav>
 
-      {/* User profile card */}
-      {user && profile && (
-        <div className="p-3 flex-shrink-0 space-y-2">
-          <div className="bg-gray-50 rounded-2xl p-3 space-y-2.5">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-sm font-bold text-indigo-700 flex-shrink-0">
-                {(profile.display_name ?? user.email ?? '?')[0].toUpperCase()}
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">
-                  {profile.display_name ?? user.email?.split('@')[0]}
-                </p>
-                <p className="text-xs font-medium" style={{ color: rankData.color }}>
-                  {rankData.emoji} {rankData.name}
-                </p>
-              </div>
-            </div>
+      {/* Widgets */}
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
+        <button
+          onClick={() => setShowWidgets(v => !v)}
+          className="flex items-center justify-between w-full px-0.5 group"
+        >
+          <span className="text-[10px] font-semibold text-gray-400 tracking-widest uppercase">วิดเจ็ต</span>
+          {showWidgets
+            ? <ChevronUp size={12} className="text-gray-300 group-hover:text-gray-400" />
+            : <ChevronDown size={12} className="text-gray-300 group-hover:text-gray-400" />}
+        </button>
+        {showWidgets && (
+          <div className="space-y-2">
+            <WeatherCard />
+            {priceTicker}
+          </div>
+        )}
+      </div>
 
-            <div className="grid grid-cols-2 gap-1.5">
-              <div className="bg-white rounded-lg p-2 text-center">
-                <p className="text-xs font-bold text-gray-900">{profile.total_predictions}</p>
-                <p className="text-[10px] text-gray-400">ทาย</p>
-              </div>
-              <div className="bg-white rounded-lg p-2 text-center">
-                <p className="text-xs font-bold text-green-600">{accuracy}%</p>
-                <p className="text-[10px] text-gray-400">แม่น</p>
-              </div>
-            </div>
-
+      {/* Profile card / Login */}
+      <div className="p-3 flex-shrink-0 border-t border-gray-100">
+        {user && profile ? (
+          <div className="flex items-center gap-1">
             <Link
               href="/profile/me"
-              className="flex items-center justify-center gap-1.5 bg-white rounded-lg px-2.5 py-1.5 hover:bg-gray-100 transition-colors"
+              className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-gray-50 transition-colors flex-1 min-w-0"
             >
-              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[9px]">P</span>
-              <span className="text-sm font-bold text-gray-900">{profile.coins.toLocaleString()}</span>
-              <span className="text-xs text-gray-400">คะแนน</span>
+              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-indigo-700 text-xs font-bold">
+                  {profile.display_name?.[0]?.toUpperCase() ?? '?'}
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-gray-800 truncate">{profile.display_name}</p>
+                <p className="text-[11px] text-gray-400 truncate">
+                  {rankInfo?.name ?? profile.rank}
+                </p>
+              </div>
             </Link>
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut()
+                window.location.href = '/login'
+              }}
+              className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+              title="ออกจากระบบ"
+            >
+              <LogOut size={15} strokeWidth={1.8} />
+            </button>
           </div>
-        </div>
-      )}
-
-      {!user && (
-        <div className="p-3 flex-shrink-0">
+        ) : (
           <Link
             href="/login"
             className="block w-full text-center bg-indigo-600 text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-indigo-700 transition-colors"
           >
             เข้าสู่ระบบ
           </Link>
-        </div>
-      )}
+        )}
+      </div>
     </aside>
   )
 }

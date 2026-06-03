@@ -23,13 +23,9 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
 
 export const ALL_GROUPS = [
   { slug: 'all',      name: 'ทั้งหมด',  subs: [] },
-  { slug: 'politics', name: 'การเมือง', subs: [] },
-  { slug: 'crypto',   name: 'Crypto',   subs: [] },
-  { slug: 'stock',    name: 'หุ้น',     subs: [] },
-  { slug: 'viral',    name: 'ไวรัล',   subs: [] },
   {
     slug: 'esports',
-    name: 'eSports',
+    name: 'เกม',
     subs: [
       { slug: 'dota2',         name: 'Dota 2',       icon: '🔴', image: 'https://cdn.akamai.steamstatic.com/steam/apps/570/capsule_sm_120.jpg' },
       { slug: 'cs2',           name: 'CS2',           icon: '🔫', image: 'https://cdn.akamai.steamstatic.com/steam/apps/730/capsule_sm_120.jpg' },
@@ -50,6 +46,10 @@ export const ALL_GROUPS = [
       { slug: 'mlb',      name: 'MLB',     icon: '⚾', image: undefined },
     ],
   },
+  { slug: 'politics', name: 'การเมือง', subs: [] },
+  { slug: 'crypto',   name: 'Crypto',   subs: [] },
+  { slug: 'stock',    name: 'หุ้น',     subs: [] },
+  { slug: 'viral',    name: 'ไวรัล',   subs: [] },
 ]
 
 export const SUB_TO_PARENT: Record<string, string> = {}
