@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Globe, Landmark, TrendingUp, Star, Gamepad2, Trophy, Bitcoin } from 'lucide-react'
 
 export const PARENT_SUBS: Record<string, string[]> = {
-  esports: ['esports', 'dota2', 'cs2', 'mlbb', 'valorant', 'lol'],
+  esports: ['esports', 'dota2', 'cs2', 'mlbb', 'valorant', 'lol', 'pubg', 'rov'],
   sports:  ['sports', 'football', 'boxing', 'nba', 'mlb'],
 }
 
@@ -31,11 +31,13 @@ export const ALL_GROUPS = [
     slug: 'esports',
     name: 'eSports',
     subs: [
-      { slug: 'dota2',    name: 'Dota 2',   icon: '🔴', image: 'https://cdn.akamai.steamstatic.com/steam/apps/570/capsule_sm_120.jpg' },
-      { slug: 'cs2',      name: 'CS2',      icon: '🔫', image: 'https://cdn.akamai.steamstatic.com/steam/apps/730/capsule_sm_120.jpg' },
-      { slug: 'valorant', name: 'Valorant', icon: '🎯', image: '/images/valorant.png' },
-      { slug: 'lol',      name: 'LoL',      icon: '⚡', image: '/images/lol.png' },
-      { slug: 'mlbb',     name: 'MLBB',     icon: '⚔️', image: '/images/mlbb.png' },
+      { slug: 'dota2',         name: 'Dota 2',       icon: '🔴', image: 'https://cdn.akamai.steamstatic.com/steam/apps/570/capsule_sm_120.jpg' },
+      { slug: 'cs2',           name: 'CS2',           icon: '🔫', image: 'https://cdn.akamai.steamstatic.com/steam/apps/730/capsule_sm_120.jpg' },
+      { slug: 'valorant',      name: 'Valorant',      icon: '🎯', image: '/images/valorant.png' },
+      { slug: 'lol',           name: 'LoL',           icon: '⚡', image: '/images/lol.png' },
+      { slug: 'mlbb',          name: 'MLBB',          icon: '⚔️', image: '/images/mlbb.png' },
+      { slug: 'pubg',          name: 'PUBG',          icon: '🎯', image: '/images/pubg.jpg' },
+      { slug: 'rov',           name: 'RoV',           icon: '⚔️', image: undefined },
     ],
   },
   {
@@ -58,9 +60,11 @@ for (const g of ALL_GROUPS) {
 interface Props {
   selected: string
   onChange: (slug: string) => void
+  liveOnly?: boolean
+  onLiveToggle?: (v: boolean) => void
 }
 
-export default function CategoryFilter({ selected, onChange }: Props) {
+export default function CategoryFilter({ selected, onChange, liveOnly, onLiveToggle }: Props) {
   const [hiddenSlugs, setHiddenSlugs] = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -85,11 +89,12 @@ export default function CategoryFilter({ selected, onChange }: Props) {
       {/* Row 1 — main categories */}
       <div className="flex gap-1.5 overflow-x-auto px-6 py-2.5 scrollbar-none">
         {GROUPS.map(g => {
-          const isActive = g.slug === activeParent
+          const isActive = g.slug === activeParent && !liveOnly
           return (
             <button
               key={g.slug}
               onClick={() => {
+                onLiveToggle?.(false)
                 if (g.subs.length > 0) {
                   onChange(g.subs[0].slug)
                 } else {
@@ -116,21 +121,21 @@ export default function CategoryFilter({ selected, onChange }: Props) {
       {hasSubs && activeGroup && (
         <div className={`flex gap-1.5 overflow-x-auto px-6 py-2 scrollbar-none bg-gray-50 border-t border-gray-100${SIDEBAR_PARENTS.has(activeParent) ? ' md:hidden' : ''}`}>
           <button
-            onClick={() => onChange(activeParent)}
+            onClick={() => { onChange(activeParent); onLiveToggle?.(false) }}
             className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-all border ${
-              selected === activeParent
+              selected === activeParent && !liveOnly
                 ? 'bg-gray-900 text-white border-gray-900'
                 : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
             }`}
           >
             ทั้งหมด
           </button>
-          {activeGroup.subs.map(s => (
+{activeGroup.subs.map(s => (
             <button
               key={s.slug}
-              onClick={() => onChange(s.slug)}
+              onClick={() => { onChange(s.slug); onLiveToggle?.(false) }}
               className={`flex-shrink-0 flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-all border ${
-                selected === s.slug
+                selected === s.slug && !liveOnly
                   ? 'bg-gray-900 text-white border-gray-900'
                   : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
               }`}

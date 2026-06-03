@@ -20,7 +20,9 @@ function timeLeft(closesAt: string): string {
   const days = Math.floor(diff / 86400000)
   const hours = Math.floor((diff % 86400000) / 3600000)
   if (days > 0) return `${days} วัน`
-  return `${hours} ชม.`
+  if (hours > 0) return `${hours} ชม.`
+  const minutes = Math.floor((diff % 3600000) / 60000)
+  return `${minutes} นาที`
 }
 
 function Countdown({ closesAt }: { closesAt: string }) {
@@ -33,7 +35,7 @@ function Countdown({ closesAt }: { closesAt: string }) {
   const days = Math.floor(diff / 86400000)
   const hours = Math.floor((diff % 86400000) / 3600000)
   const mins = Math.floor((diff % 3600000) / 60000)
-  const label = days > 0 ? `${days} วัน` : `${hours}:${String(mins).padStart(2,'0')}`
+  const label = days > 0 ? `${days} วัน` : hours > 0 ? `${hours} ชม.` : `${mins} นาที`
   return (
     <span className="flex items-center gap-1 text-xs text-gray-500 flex-shrink-0">
       <Clock size={11} className="text-amber-400" /> {label}

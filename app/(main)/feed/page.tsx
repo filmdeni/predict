@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, Suspense, useRef, useCallback } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { TrendingUp, Users, ArrowRight, BarChart2, Radio } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -19,9 +19,6 @@ type Question = Database['public']['Tables']['questions']['Row'] & {
   categories: { name_th: string; emoji: string; slug: string }
 }
 type TrendingQuestion = Question & { recent_count: number }
-
-// shared drag state across sections
-const draggedQuestionRef = { current: null as Question | null }
 
 // ── Admin drag-to-reorder grid ──────────────────────────────────────────────
 function DraggableGrid({
@@ -91,7 +88,6 @@ function FutureRadarCard({ question, isHot, recentCount, predictedIds }: {
   question: TrendingQuestion
   isHot?: boolean
   recentCount?: number
-  savedIds: Set<string>
   predictedIds: Set<string>
 }) {
   const shares = getPoolShares(question.pool)
@@ -250,12 +246,7 @@ function TopPredictorsRow() {
 }
 
 // ── Market Overview chart ────────────────────────────────────────────────────
-const MOCK_CHART_7D = [
-  { d: 'May 15', v: 8000 }, { d: 'May 16', v: 11000 }, { d: 'May 17', v: 9500 },
-  { d: 'May 18', v: 14000 }, { d: 'May 19', v: 13000 }, { d: 'May 20', v: 17000 }, { d: 'May 21', v: 21000 },
-]
-
-function MarketOverview({ stats }: { stats: { todayPredictions: number; openCount: number; totalPool: number } | null }) {
+function MarketOverview({ stats, chartData }: { stats: { todayPredictions: number; openCount: number; totalPool: number } | null; chartData: { d: string; v: number }[] }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
       <div className="flex items-center gap-2">
@@ -280,7 +271,7 @@ function MarketOverview({ stats }: { stats: { todayPredictions: number; openCoun
 
       <div className="h-28">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={MOCK_CHART_7D}>
+          <LineChart data={chartData}>
             <XAxis dataKey="d" tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
             <Tooltip
               contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e5e7eb' }}
@@ -370,28 +361,43 @@ function ReferralCapture() {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function FeedPage() {
+  const searchParamsFeed = useSearchParams()
+  const router = useRouter()
   const [questions, setQuestions] = useState<Question[]>([])
   const [trending, setTrending] = useState<TrendingQuestion[]>([])
-  const [category, setCategory] = useState('all')
+  const [category, setCategory] = useState(() => searchParamsFeed.get('category') ?? 'all')
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [predictedIds, setPredictedIds] = useState<Set<string>>(new Set())
   const [stats, setStats] = useState<{ todayPredictions: number; openCount: number; totalPool: number } | null>(null)
+  const [chartData, setChartData] = useState<{ d: string; v: number }[]>([])
   const [tickKey, setTickKey] = useState(0)
   const [mainGridOrdered, setMainGridOrdered] = useState<Question[]>([])
   const [trendingDropOver, setTrendingDropOver] = useState(false)
   const [pinnedHeroId, setPinnedHeroId] = useState<string | null>(null)
   const [now, setNow] = useState(() => new Date())
+  const [liveOnly, setLiveOnly] = useState(false)
+  const draggedQuestionRef = useRef<Question | null>(null)
   const supabase = createClient()
+
+  const changeCategory = useCallback((slug: string) => {
+    setCategory(slug)
+    const params = new URLSearchParams(window.location.search)
+    if (slug === 'all') { params.delete('category') } else { params.set('category', slug) }
+    router.replace(`/feed${params.size > 0 ? `?${params}` : ''}`, { scroll: false })
+  }, [router])
+
+  const adminPin = useCallback(async (action: string, questionId: string) => {
+    await fetch('/api/admin/pin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, questionId }) })
+  }, [])
 
   const pinToTrending = useCallback(async (q: Question) => {
     if (trending.some(t => t.id === q.id)) return
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await supabase.from('questions').update({ is_pinned_trending: true, is_daily_hero: false } as any).eq('id', q.id)
+    await adminPin('pin_trending', q.id)
     if (pinnedHeroId === q.id) setPinnedHeroId(null)
     setTrending(prev => [{ ...q, recent_count: q.predictions_count, is_pinned_trending: true }, ...prev].slice(0, 4))
-  }, [supabase, trending, pinnedHeroId])
+  }, [adminPin, trending, pinnedHeroId])
 
   const saveTrendingOrder = useCallback(async (ordered: TrendingQuestion[]) => {
     setTrending(ordered)
@@ -402,27 +408,22 @@ export default function FeedPage() {
   }, [supabase])
 
   const unpinFromTrending = useCallback(async (id: string) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await supabase.from('questions').update({ is_pinned_trending: false } as any).eq('id', id)
+    await adminPin('unpin_trending', id)
     setTrending(prev => prev.filter(t => t.id !== id))
-  }, [supabase])
+  }, [adminPin])
 
   const pinToHero = useCallback(async (q: Question) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await supabase.from('questions').update({ is_daily_hero: false } as any).neq('id', q.id)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await supabase.from('questions').update({ is_daily_hero: true, is_pinned_trending: false } as any).eq('id', q.id)
+    await adminPin('set_hero', q.id)
     setTrending(prev => prev.filter(x => x.id !== q.id))
     setPinnedHeroId(q.id)
-  }, [supabase])
+  }, [adminPin])
 
   const unpinHero = useCallback(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await supabase.from('questions').update({ is_daily_hero: false } as any).eq('is_daily_hero', true)
+    if (pinnedHeroId) await adminPin('unset_hero', pinnedHeroId)
     setQuestions(prev => prev.map(x => ({ ...x, is_daily_hero: false })))
     setTrending(prev => prev.map(x => ({ ...x, is_daily_hero: false })))
     setPinnedHeroId(null)
-  }, [supabase])
+  }, [adminPin, pinnedHeroId])
 
   const saveOrder = useCallback(async (ordered: Question[]) => {
     setMainGridOrdered(ordered)
@@ -448,12 +449,29 @@ export default function FeedPage() {
   useEffect(() => {
     async function loadStats() {
       const since24h = new Date(Date.now() - 86400000).toISOString()
-      const [{ count: todayCount }, { data: openQs }] = await Promise.all([
+      const since7d = new Date(Date.now() - 7 * 86400000).toISOString()
+      const [{ count: todayCount }, { data: openQs }, { data: weekPreds }] = await Promise.all([
         supabase.from('predictions').select('*', { count: 'exact', head: true }).gte('placed_at', since24h),
         supabase.from('questions').select('total_pool').eq('status', 'open'),
+        supabase.from('predictions').select('placed_at').gte('placed_at', since7d),
       ])
       const totalPool = (openQs ?? []).reduce((s, q) => s + ((q as { total_pool: number }).total_pool ?? 0), 0)
       setStats({ todayPredictions: todayCount ?? 0, openCount: (openQs ?? []).length, totalPool })
+
+      // Build 7-day chart from real prediction data
+      const months = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']
+      const counts: Record<string, number> = {}
+      for (const p of weekPreds ?? []) {
+        const d = new Date(p.placed_at)
+        const key = `${d.getDate()} ${months[d.getMonth()]}`
+        counts[key] = (counts[key] ?? 0) + 1
+      }
+      const days = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(Date.now() - (6 - i) * 86400000)
+        const key = `${d.getDate()} ${months[d.getMonth()]}`
+        return { d: key, v: counts[key] ?? 0 }
+      })
+      setChartData(days)
     }
     loadStats()
 
@@ -576,7 +594,7 @@ export default function FeedPage() {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [category])
+  }, [category, liveOnly])
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60_000)
@@ -584,10 +602,22 @@ export default function FeedPage() {
   }, [])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { setMainGridOrdered([]) }, [category, loading])
+  useEffect(() => { setMainGridOrdered([]) }, [category, liveOnly, loading])
 
-  const active = questions.filter(q => q.status !== 'resolved' && !(q.status === 'open' && new Date(q.closes_at) <= now))
-  const resolved = questions.filter(q => q.status === 'resolved')
+  // "สด" = closes_at อีกไม่เกิน 3 วัน + ยังไม่เฉลย
+  const isLive = (q: Question) => {
+    const msLeft = new Date(q.closes_at).getTime() - now.getTime()
+    return msLeft <= 3 * 24 * 60 * 60 * 1000
+      && q.status !== 'resolved'
+      && q.status !== 'cancelled'
+  }
+
+  const active = questions
+    .filter(q => q.status !== 'resolved' && !(q.status === 'open' && new Date(q.closes_at) <= now))
+    .filter(q => !liveOnly || isLive(q))
+  const resolved = questions
+    .filter(q => q.status === 'resolved')
+    .filter(q => !liveOnly || isLive(q))
   const hotIds = new Set(trending.filter(t => t.id !== pinnedHeroId).map(t => t.id))
   const hotCounts: Record<string, number> = {}
   trending.forEach(t => { hotCounts[t.id] = t.recent_count })
@@ -595,6 +625,8 @@ export default function FeedPage() {
   const pinnedHero = pinnedHeroId ? active.find(q => q.id === pinnedHeroId) ?? null : null
   const heroId = pinnedHero?.id
   const mainGrid = active.filter(q => q.id !== heroId && (category !== 'all' || !hotIds.has(q.id)))
+
+  const hasLiveQuestions = questions.some(q => isLive(q))
 
   const activeParent = SUB_TO_PARENT[category] ?? category
   const hasSidebar = SIDEBAR_PARENTS.has(activeParent)
@@ -611,7 +643,7 @@ export default function FeedPage() {
 
         {/* ── Category filter ── */}
         <div className="-mx-4 md:-mx-6">
-          <CategoryFilter selected={category} onChange={setCategory} />
+          <CategoryFilter selected={category} onChange={changeCategory} liveOnly={liveOnly} onLiveToggle={setLiveOnly} />
         </div>
 
         <div className={hasSidebar ? 'flex gap-5 -mt-2' : 'contents'}>
@@ -621,19 +653,34 @@ export default function FeedPage() {
           <aside className="hidden md:block w-44 flex-shrink-0 pt-2">
             <div className="bg-white rounded-xl border border-gray-100 overflow-hidden sticky top-4">
               <button
-                onClick={() => setCategory(activeParent)}
+                onClick={() => { changeCategory(activeParent); setLiveOnly(false) }}
                 className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b border-gray-100 transition-colors ${
-                  category === activeParent ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+                  category === activeParent && !liveOnly ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
                 }`}
               >
                 ทั้งหมด
               </button>
+              {hasLiveQuestions && (
+                <button
+                  onClick={() => { changeCategory(activeParent); setLiveOnly(v => !v) }}
+                  className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b border-gray-100 transition-colors ${
+                    liveOnly ? 'bg-red-50 text-red-600 font-semibold' : 'text-red-400 hover:text-red-600 hover:bg-red-50'
+                  }`}
+                >
+                  <span className="relative flex items-center justify-center w-3.5 h-3.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-40 bg-red-500" />
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="relative">
+                      <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>
+                  </span>
+                  สด
+                </button>
+              )}
               {sidebarGroup.subs.map(s => (
                 <button
                   key={s.slug}
-                  onClick={() => setCategory(s.slug)}
+                  onClick={() => { changeCategory(s.slug); setLiveOnly(false) }}
                   className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium border-b border-gray-100 last:border-0 transition-colors ${
-                    category === s.slug ? 'bg-gray-200 text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+                    category === s.slug && !liveOnly ? 'bg-gray-200 text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
                   }`}
                 >
                   {s.image
@@ -717,7 +764,6 @@ export default function FeedPage() {
                         question={q}
                         isHot={hotIds.has(q.id)}
                         recentCount={q.recent_count}
-                        savedIds={savedIds}
                         predictedIds={predictedIds}
                       />
                     </div>
@@ -730,7 +776,7 @@ export default function FeedPage() {
             {category === 'all' && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <TopPredictorsRow />
-                <MarketOverview stats={stats} />
+                <MarketOverview stats={stats} chartData={chartData} />
               </div>
             )}
 

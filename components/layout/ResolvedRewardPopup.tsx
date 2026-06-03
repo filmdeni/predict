@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getRank, getNextRank } from '@/lib/game/ranks'
+import { triggerRewardClaim } from './RewardClaimFX'
 
 interface RewardData {
   predictionId: string
@@ -64,69 +65,16 @@ export default function ResolvedRewardPopup() {
 
   function handleClaim() {
     const btn = btnRef.current
-    const target = document.getElementById('header-coins')
-    if (!btn || !target || flying) { setReward(null); return }
-
-    const from = btn.getBoundingClientRect()
-    const to = target.getBoundingClientRect()
-
-    const dx = (to.left + to.width / 2) - (from.left + from.width / 2)
-    const dy = (to.top + to.height / 2) - (from.top + from.height / 2)
-
-    // inject keyframes once
-    const styleId = 'fly-coin-kf'
-    if (!document.getElementById(styleId)) {
-      const s = document.createElement('style')
-      s.id = styleId
-      s.textContent = `
-        @keyframes fly-coin {
-          0%   { transform: translate(0,0) scale(1); opacity: 1; }
-          80%  { opacity: 1; }
-          100% { transform: translate(var(--dx), var(--dy)) scale(0.4); opacity: 0; }
-        }
-      `
-      document.head.appendChild(s)
-    }
+    if (!btn || flying) { setReward(null); return }
 
     setFlying(true)
-
-    // spawn 6 coins with staggered delays from button center
-    const startX = from.left + from.width / 2
-    const startY = from.top + from.height / 2
-
-    const coins: HTMLElement[] = Array.from({ length: 6 }, (_, i) => {
-      const el = document.createElement('div')
-      el.style.cssText = `
-        position: fixed;
-        left: ${startX - 12}px;
-        top: ${startY - 12}px;
-        width: 24px; height: 24px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #fb923c, #f59e0b);
-        color: white; font-weight: 900; font-size: 11px;
-        display: flex; align-items: center; justify-content: center;
-        pointer-events: none; z-index: 9999;
-        --dx: ${dx + (Math.random() * 16 - 8)}px;
-        --dy: ${dy + (Math.random() * 16 - 8)}px;
-        animation: fly-coin 0.7s cubic-bezier(.4,0,.2,1) ${i * 60}ms forwards;
-      `
-      el.textContent = 'P'
-      document.body.appendChild(el)
-      return el
-    })
-
-    // flash target
-    setTimeout(() => {
-      target.classList.add('scale-125', 'brightness-125')
-      setTimeout(() => target.classList.remove('scale-125', 'brightness-125'), 300)
-    }, 500)
+    triggerRewardClaim(btn, reward?.coinsWon ?? 0, `+${(reward?.coinsWon ?? 0).toLocaleString()} P`)
 
     setTimeout(() => {
-      coins.forEach(c => c.remove())
       setFlying(false)
       setReward(null)
       window.dispatchEvent(new Event('coins-updated'))
-    }, 800)
+    }, 900)
   }
 
   function showMock() {

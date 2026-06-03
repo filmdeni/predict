@@ -21,7 +21,7 @@ const GAME_CATEGORY: Record<string, number> = {
   'dota-2':             28, // Dota 2
   'valorant':           38, // Valorant
   'league-of-legends':  39, // LoL
-  'mlbb':               37, // Mobile Legends
+  'mlbb':               37, // MLBB
 }
 
 const GAME_LABEL: Record<string, string> = {
@@ -32,7 +32,7 @@ const GAME_LABEL: Record<string, string> = {
   'mlbb':               'MLBB',
 }
 
-const GAME_IMAGE: Record<string, string> = {
+const GAME_IMAGE: Record<string, string | undefined> = {
   'cs-go':             'https://cdn.akamai.steamstatic.com/steam/apps/730/header.jpg',
   'dota-2':            'https://cdn.akamai.steamstatic.com/steam/apps/570/header.jpg',
   'valorant':          '/images/valorant.png',

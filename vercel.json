@@ -27,6 +27,22 @@
     {
       "path": "/api/sports/resolve",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/rov/seed",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/rov/resolve",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/pubg/seed",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/pubg/resolve",
+      "schedule": "0 12 * * *"
     }
   ]
 }

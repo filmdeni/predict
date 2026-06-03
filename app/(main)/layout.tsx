@@ -3,6 +3,7 @@ import BottomNav from '@/components/layout/BottomNav'
 import Sidebar from '@/components/layout/Sidebar'
 import DailyBonusProvider from '@/components/layout/DailyBonusProvider'
 import ResolvedRewardPopup from '@/components/layout/ResolvedRewardPopup'
+import RewardClaimFX, { RewardClaimDevButtons } from '@/components/layout/RewardClaimFX'
 import ToastContainer from '@/components/ui/Toast'
 import HowToPlayModal from '@/components/layout/HowToPlayModal'
 
@@ -11,6 +12,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     <div className="min-h-screen bg-[#f5f5f5]">
       <DailyBonusProvider />
       <ResolvedRewardPopup />
+      <RewardClaimFX />
+      <RewardClaimDevButtons />
       <HowToPlayModal />
 
       {/* Sidebar — desktop only */}

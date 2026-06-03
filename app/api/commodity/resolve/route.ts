@@ -64,7 +64,7 @@ async function resolveQuestion(questionId: string, correctOption: string, finalP
   // Fetch all predictions for this question
   const { data: preds, error: predsErr } = await supabase
     .from('predictions')
-    .select('id, user_id, option_id, coins_wagered')
+    .select('id, user_id, option_id, coins_wagered, early_bird_bonus')
     .eq('question_id', questionId)
     .is('resolved_at', null)
 
@@ -99,7 +99,8 @@ async function resolveQuestion(questionId: string, correctOption: string, finalP
     let repDelta = 0
 
     if (isCorrect) {
-      coinsWon = calcPayout(totalPool, winnerPool, pred.coins_wagered)
+      const earlyBird = Number((pred as any).early_bird_bonus ?? 1)
+      coinsWon = Math.floor(calcPayout(totalPool, winnerPool, pred.coins_wagered) * earlyBird)
       repDelta = parseFloat((Math.log(coinsWon / Math.max(pred.coins_wagered, 1)) * 10 + 5).toFixed(2))
       repDelta = Math.max(1, repDelta)
     } else {

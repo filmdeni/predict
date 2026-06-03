@@ -100,7 +100,7 @@ export default function Header() {
             <div className="flex items-center gap-2">
               {coins !== null && (
                 <Link
-                  id="header-coins"
+                  id="wallet-coin-target"
                   href="/profile/me"
                   className="hidden sm:flex items-center gap-1.5 bg-gray-100 rounded-full px-3 py-1.5 hover:bg-gray-200 transition-colors"
                 >

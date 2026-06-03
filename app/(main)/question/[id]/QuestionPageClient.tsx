@@ -9,11 +9,12 @@ import type { Database } from '@/lib/supabase/types'
 import type { User } from '@supabase/supabase-js'
 import { getOdds, getPoolShares } from '@/lib/game/odds'
 import { urgencyLevel } from '@/lib/game/time'
-import { ArrowLeft, Share2, Link2, Check } from 'lucide-react'
+import { ArrowLeft, Share2, Link2, Check, Lock } from 'lucide-react'
 import ProbabilityChart from '@/components/question/ProbabilityChart'
+import { SIDEBAR_PARENTS, ALL_GROUPS, SUB_TO_PARENT } from '@/components/feed/CategoryFilter'
 
 type Question = Database['public']['Tables']['questions']['Row'] & {
-  categories: { name_th: string; emoji: string }
+  categories: { name_th: string; emoji: string; slug: string }
   creator?: { display_name: string; username: string } | null
 }
 
@@ -78,7 +79,7 @@ export default function QuestionPageClient() {
   useEffect(() => {
     async function load() {
       const [{ data }, { data: { user } }] = await Promise.all([
-        supabase.from('questions').select('*, categories(name_th, emoji), creator:created_by(display_name, username)').eq('id', id).single(),
+        supabase.from('questions').select('*, categories(name_th, emoji, slug), creator:created_by(display_name, username)').eq('id', id).single(),
         supabase.auth.getUser(),
       ])
       setQuestion(data as unknown as Question)
@@ -158,12 +159,17 @@ export default function QuestionPageClient() {
   const options = question.options as { id: string; label: string; icon_url?: string | null }[]
   const shares = getPoolShares(question.pool)
 
-  return (
-    <div className="max-w-2xl mx-auto p-6 space-y-5">
+  const catSlug = question.categories.slug
+  const activeParent = SUB_TO_PARENT[catSlug] ?? catSlug
+  const hasSidebar = SIDEBAR_PARENTS.has(activeParent)
+  const sidebarGroup = hasSidebar ? ALL_GROUPS.find(g => g.slug === activeParent) : null
+
+  const content = (
+    <div className="max-w-2xl mx-auto md:mx-0 p-6 space-y-5 w-full">
       {/* back + share */}
       <div className="flex items-center justify-between">
         <button
-          onClick={() => router.back()}
+          onClick={() => { if (window.history.length > 1) { window.history.back() } else { router.push('/feed') } }}
           className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
         >
           <ArrowLeft size={16} /> กลับ
@@ -309,6 +315,35 @@ export default function QuestionPageClient() {
                     </div>
                   )
                 }
+                if (meta.type === 'pubg_tournament') {
+                  const tournamentName = (meta.tournament_name as string ?? '').replace(/PUBG Global Series\//,'PGS ').replace(/\//g,' - ')
+                  const liquipediaUrl = `https://liquipedia.net/pubg/${(meta.tournament_page as string ?? '').replace(/ /g,'_')}`
+                  return (
+                    <div className="space-y-1.5">
+                      <p className="text-xs text-amber-600 font-semibold">🏆 PUBG Global Series</p>
+                      <p className="text-xs text-gray-500">{tournamentName} · 24 ทีมทั่วโลก</p>
+                      <a href={liquipediaUrl} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors">
+                        <span className="text-xs">📊</span>
+                        <span className="text-xs font-medium text-gray-600">ดูข้อมูล tournament บน Liquipedia</span>
+                      </a>
+                    </div>
+                  )
+                }
+                if (meta.type === 'rov') {
+                  const liquipediaUrl = `https://liquipedia.net/arenaofvalor/${(meta.page_ref as string ?? '').replace(/ /g,'_')}`
+                  return (
+                    <div className="space-y-1.5">
+                      <p className="text-xs text-blue-600 font-semibold">⚔️ RoV Pro League</p>
+                      <p className="text-xs text-gray-500">Best of {meta.bestof ?? 3}</p>
+                      <a href={liquipediaUrl} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors">
+                        <span className="text-xs">📊</span>
+                        <span className="text-xs font-medium text-gray-600">ดูข้อมูลแมตช์บน Liquipedia</span>
+                      </a>
+                    </div>
+                  )
+                }
                 if (meta.type === 'sports') {
                   const isFootball = meta.league && !meta.weight_class && !meta.event_name
                   if (isFootball) {
@@ -413,36 +448,80 @@ export default function QuestionPageClient() {
         </div>
 
         {/* pool bar */}
-        <div className="px-4 pb-4 space-y-2">
-          <div className="flex h-2 rounded-full overflow-hidden gap-0.5">
-            {options.map((opt, i) => {
-              const colors = ['bg-green-400', 'bg-blue-400', 'bg-orange-400', 'bg-purple-400']
-              return (
-                <div
-                  key={opt.id}
-                  className={`${colors[i % colors.length]} transition-all duration-500`}
-                  style={{ width: `${shares[opt.id] ?? 0}%` }}
-                />
-              )
-            })}
-          </div>
-          <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
-            {options.map((opt, i) => {
-              const dotColors = ['bg-green-400', 'bg-blue-400', 'bg-orange-400', 'bg-purple-400']
-              return (
-                <div key={opt.id} className="flex items-center gap-1">
-                  {opt.icon_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={opt.icon_url} alt="" className="w-3 h-3 rounded object-cover flex-shrink-0" />
-                  ) : (
-                    <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${dotColors[i % dotColors.length]}`} />
-                  )}
-                  <span className="text-xs text-gray-500">{opt.label}</span>
-                  <span className="text-xs font-bold text-gray-900">{(shares[opt.id] ?? 0).toFixed(0)}%</span>
+        <div className="px-4 pb-4 space-y-2.5">
+          {question.status === 'open' ? (
+            /* Blind pool: hide community distribution while open */
+            <div className="flex items-center gap-2 py-1">
+              <Lock size={13} className="text-gray-400 flex-shrink-0" />
+              <span className="text-xs text-gray-400">สัดส่วนเปิดเผยหลังปิดรับทาย</span>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <p className="text-[10px] text-gray-400 font-medium">ชุมชนทาย</p>
+              <div className="flex h-2 rounded-full overflow-hidden gap-0.5">
+                {options.map((opt, i) => {
+                  const colors = ['bg-green-400', 'bg-blue-400', 'bg-orange-400', 'bg-purple-400']
+                  return (
+                    <div
+                      key={opt.id}
+                      className={`${colors[i % colors.length]} transition-all duration-500`}
+                      style={{ width: `${shares[opt.id] ?? 0}%` }}
+                    />
+                  )
+                })}
+              </div>
+              <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
+                {options.map((opt, i) => {
+                  const dotColors = ['bg-green-400', 'bg-blue-400', 'bg-orange-400', 'bg-purple-400']
+                  return (
+                    <div key={opt.id} className="flex items-center gap-1">
+                      {opt.icon_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={opt.icon_url} alt="" className="w-3 h-3 rounded object-cover flex-shrink-0" />
+                      ) : (
+                        <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${dotColors[i % dotColors.length]}`} />
+                      )}
+                      <span className="text-xs text-gray-500">{opt.label}</span>
+                      <span className="text-xs font-bold text-gray-900">{(shares[opt.id] ?? 0).toFixed(0)}%</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* market odds bar — shown regardless of status */}
+          {matchPreview?.marketOdds && (
+            <div className="space-y-1">
+              <p className="text-[10px] text-gray-400 font-medium">Vegas คาด</p>
+              <div className="flex h-2 rounded-full overflow-hidden gap-0.5">
+                <div className="bg-green-300 transition-all duration-500" style={{ width: `${matchPreview.marketOdds.home}%` }} />
+                {matchPreview.marketOdds.draw != null && (
+                  <div className="bg-gray-300 transition-all duration-500" style={{ width: `${matchPreview.marketOdds.draw}%` }} />
+                )}
+                <div className="bg-blue-300 transition-all duration-500" style={{ width: `${matchPreview.marketOdds.away}%` }} />
+              </div>
+              <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
+                <div className="flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-full flex-shrink-0 bg-green-300" />
+                  <span className="text-xs text-gray-500">{options[0]?.label}</span>
+                  <span className="text-xs font-bold text-gray-900">{matchPreview.marketOdds.home}%</span>
                 </div>
-              )
-            })}
-          </div>
+                {matchPreview.marketOdds.draw != null && (
+                  <div className="flex items-center gap-1">
+                    <span className="inline-block w-2 h-2 rounded-full flex-shrink-0 bg-gray-300" />
+                    <span className="text-xs text-gray-500">เสมอ</span>
+                    <span className="text-xs font-bold text-gray-900">{matchPreview.marketOdds.draw}%</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-full flex-shrink-0 bg-blue-300" />
+                  <span className="text-xs text-gray-500">{options[1]?.label}</span>
+                  <span className="text-xs font-bold text-gray-900">{matchPreview.marketOdds.away}%</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* stats row */}
@@ -454,8 +533,8 @@ export default function QuestionPageClient() {
           </span>
         </div>
 
-        {/* Probability trend chart */}
-        {options.length > 3 && (
+        {/* Probability trend chart — only after closed */}
+        {options.length > 3 && question.status !== 'open' && (
           <div className="px-4 pb-4">
             <ProbabilityChart
               questionId={id}
@@ -639,6 +718,43 @@ export default function QuestionPageClient() {
           }}
         />
       )}
+    </div>
+  )
+
+  if (!hasSidebar || !sidebarGroup) return content
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 md:px-6 pt-4 pb-8">
+      <div className="flex gap-5">
+        <aside className="hidden md:block w-44 flex-shrink-0 pt-2">
+          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden sticky top-4">
+            <button
+              onClick={() => router.push(`/feed?category=${activeParent}`)}
+              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b border-gray-100 text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors"
+            >
+              ทั้งหมด
+            </button>
+            {sidebarGroup.subs.map(s => (
+              <button
+                key={s.slug}
+                onClick={() => router.push(`/feed?category=${s.slug}`)}
+                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium border-b border-gray-100 last:border-0 transition-colors ${
+                  catSlug === s.slug ? 'bg-gray-200 text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+                }`}
+              >
+                {s.image
+                  ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={s.image} alt={s.name} className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                  : <span>{s.icon}</span>
+                }
+                <span>{s.name}</span>
+              </button>
+            ))}
+          </div>
+        </aside>
+        <div className="flex-1 min-w-0">
+          {content}
+        </div>
+      </div>
     </div>
   )
 }

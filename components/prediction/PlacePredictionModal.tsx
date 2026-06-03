@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { estimatePayout } from '@/lib/game/odds'
 import { getRank } from '@/lib/game/ranks'
 import type { Database } from '@/lib/supabase/types'
-import { X, Check } from 'lucide-react'
+import { X, Check, Lock, Zap } from 'lucide-react'
 import { toast } from '@/components/ui/Toast'
+import { playPredictionSound, triggerBellPing } from '@/components/layout/RewardClaimFX'
 import { useCountUp } from '@/lib/hooks/useCountUp'
 
 type Question = Database['public']['Tables']['questions']['Row']
@@ -36,9 +36,9 @@ export default function PlacePredictionModal({ question, optionId, onClose, onSu
   const [error, setError] = useState<string | null>(null)
   const [popKey, setPopKey] = useState(0)
   const rippleRef = useRef<HTMLSpanElement>(null)
+  const submitBtnRef = useRef<HTMLButtonElement>(null)
   const supabase = createClient()
 
-  const animatedPayout = useCountUp(estimatePayout(question.pool, optionId, coins))
   const animatedCoins = useCountUp(coins)
 
   const handleSlider = useCallback((v: number) => {
@@ -61,12 +61,12 @@ export default function PlacePredictionModal({ question, optionId, onClose, onSu
   }, [])
 
   const option = (question.options as { id: string; label: string }[]).find(o => o.id === optionId)
-  const payout = estimatePayout(question.pool, optionId, coins)
-  const pool = question.pool as Record<string, number>
-  const totalPool = Object.values(pool).reduce((s, v) => s + v, 0)
-  const optionPool = pool[optionId] ?? 0
-  const pricePct = totalPool > 0 ? Math.round((optionPool / totalPool) * 100) : 50
-  const gainPct = coins > 0 ? Math.round(((payout - coins) / coins) * 100) : 0
+
+  const createdAt = new Date(question.created_at).getTime()
+  const closesAt = new Date(question.closes_at).getTime()
+  const fraction = (Date.now() - createdAt) / Math.max(closesAt - createdAt, 1)
+  const earlyBirdBonus = fraction <= 0.10 ? 1.10 : fraction <= 0.30 ? 1.05 : 1.00
+  const earlyBirdLabel = earlyBirdBonus >= 1.10 ? '+10% Early Bird' : earlyBirdBonus >= 1.05 ? '+5% Early Bird' : null
 
   async function submit() {
     setLoading(true)
@@ -103,8 +103,12 @@ export default function PlacePredictionModal({ question, optionId, onClose, onSu
       }
 
       setSuccess(true)
+      playPredictionSound()
       toast(`ทายแล้ว! วาง ${coins.toLocaleString()} คะแนน 🔮`)
+      // capture rect now (before modal closes), fire after modal unmounts
+      const srcRect = submitBtnRef.current?.getBoundingClientRect() ?? null
       setTimeout(() => onSuccess(coins), 700)
+      if (srcRect) setTimeout(() => triggerBellPing(srcRect), 800)
     } catch {
       setError('เกิดข้อผิดพลาด ลองใหม่อีกครั้ง')
       setLoading(false)
@@ -139,16 +143,17 @@ export default function PlacePredictionModal({ question, optionId, onClose, onSu
           </button>
         </div>
 
-        {/* selected option + price */}
+        {/* selected option + early bird badge */}
         <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-400 mb-0.5">คำทายของคุณ</p>
             <p className="text-gray-900 font-semibold">{option?.label}</p>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-gray-400 mb-0.5">โอกาสชนะ</p>
-            <p className="text-gray-900 font-bold">{pricePct}%</p>
-          </div>
+          {earlyBirdLabel && (
+            <span className="flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+              <Zap size={11} className="fill-amber-500 text-amber-500" /> {earlyBirdLabel}
+            </span>
+          )}
         </div>
 
         {/* coin slider */}
@@ -190,28 +195,26 @@ export default function PlacePredictionModal({ question, optionId, onClose, onSu
           <p className="text-[11px] text-gray-400 text-right">สูงสุด {maxWager.toLocaleString()} P ตามแรงก์ของคุณ</p>
         </div>
 
-        {/* payout estimate */}
-        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 space-y-1.5">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">คะแนนที่จะได้รับ <span className="text-gray-400 font-normal">(ประมาณ)</span></span>
-            <span key={`pay-${popKey}`} className="text-green-600 font-bold text-lg flex items-center gap-1.5 animate-num-pop">
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-black text-[10px] leading-none">P</span>
-              ~{animatedPayout.toLocaleString()} คะแนน
-            </span>
+        {/* blind payout info */}
+        <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 space-y-1.5">
+          <div className="flex items-center gap-2">
+            <Lock size={14} className="text-gray-400 flex-shrink-0" />
+            <span className="text-sm text-gray-600 font-medium">คะแนนที่ได้รับ — เปิดเผยหลังปิดรับทาย</span>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-400">คะแนนที่เพิ่มขึ้น</span>
-            <span key={`gain-${popKey}`} className="text-xs font-semibold text-green-600 animate-tickUp">
-              ~+{(animatedPayout - coins).toLocaleString()} คะแนน ({gainPct > 0 ? '+' : ''}{gainPct}%)
-            </span>
-          </div>
-          <p className="text-xs text-gray-400 pt-1 border-t border-green-100">คะแนนที่ได้รับขึ้นอยู่กับจำนวนผู้ร่วมทายทั้งหมด</p>
+          <p className="text-xs text-gray-400">คะแนนคำนวณจาก pool รวมเมื่อปิดรับ ทายเร็วได้โบนัสเพิ่ม</p>
+          {earlyBirdLabel && (
+            <div className="flex items-center gap-1.5 pt-1 border-t border-gray-200">
+              <Zap size={11} className="fill-amber-500 text-amber-500 flex-shrink-0" />
+              <span className="text-xs text-amber-600 font-semibold">ได้รับโบนัส {earlyBirdLabel} เพราะทายเร็ว!</span>
+            </div>
+          )}
         </div>
 
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
         {/* confirm */}
         <button
+          ref={submitBtnRef}
           onClick={e => { handleRipple(e); submit() }}
           disabled={loading || success}
           className="relative overflow-hidden w-full py-4 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all active:scale-[0.97]"

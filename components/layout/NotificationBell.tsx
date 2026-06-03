@@ -55,7 +55,16 @@ interface ShareNotif {
   createdAt: string
 }
 
-type Notif = PredictionNotif | ReplyNotif | ReferralNotif | QuestionStatusNotif | ShareNotif
+interface PredPlacedNotif {
+  kind: 'prediction_placed'
+  id: string
+  message: string
+  questionId: string
+  read: boolean
+  createdAt: string
+}
+
+type Notif = PredictionNotif | ReplyNotif | ReferralNotif | QuestionStatusNotif | ShareNotif | PredPlacedNotif
 
 export default function NotificationBell() {
   const supabase = createClient()
@@ -109,6 +118,19 @@ export default function NotificationBell() {
               setUnread(u => u + 1)
               return
             }
+            if (n.type === 'prediction_placed') {
+              const notif: PredPlacedNotif = {
+                kind: 'prediction_placed',
+                id: n.id,
+                message: n.message ?? 'ทายเรียบร้อยแล้ว',
+                questionId: n.question_id ?? '',
+                read: false,
+                createdAt: n.created_at,
+              }
+              setNotifs(prev => [notif, ...prev])
+              setUnread(u => u + 1)
+              return
+            }
             const { data: comment } = await supabase
               .from('comments')
               .select('body, question_id, users(display_name)')
@@ -134,6 +156,10 @@ export default function NotificationBell() {
 
       return () => { supabase.removeChannel(channel) }
     })
+
+    function onBellPing() { setUnread(n => n + 1) }
+    window.addEventListener('bell-ping', onBellPing)
+    return () => window.removeEventListener('bell-ping', onBellPing)
   }, [])
 
   async function loadNotifs(userId: string) {
@@ -149,7 +175,7 @@ export default function NotificationBell() {
         .from('notifications')
         .select('id, type, read, created_at, message, coins_gained, coins_won, question_id, comment_id, comments(body, question_id, users(display_name))')
         .eq('user_id', userId)
-        .in('type', ['reply', 'referral', 'question_approved', 'question_rejected', 'share'])
+        .in('type', ['reply', 'referral', 'question_approved', 'question_rejected', 'share', 'prediction_placed'])
         .order('created_at', { ascending: false })
         .limit(20),
     ])
@@ -166,7 +192,7 @@ export default function NotificationBell() {
     }))
 
     type NotifRow = { id: string; type: string; read: boolean; created_at: string; message: string | null; coins_gained: number | null; coins_won: number | null; question_id: string | null; comment_id: string | null; comments: { body: string; question_id: string; users: { display_name: string } | null } | null }
-    const dbNotifs: (ReplyNotif | ReferralNotif | QuestionStatusNotif | ShareNotif)[] = ((replyRes.data ?? []) as unknown as NotifRow[]).map((n) => {
+    const dbNotifs: (ReplyNotif | ReferralNotif | QuestionStatusNotif | ShareNotif | PredPlacedNotif)[] =((replyRes.data ?? []) as unknown as NotifRow[]).map((n) => {
       if (n.type === 'referral') {
         return {
           kind: 'referral' as const,
@@ -183,6 +209,16 @@ export default function NotificationBell() {
           kind: n.type as 'question_approved' | 'question_rejected',
           id: n.id,
           message: n.message ?? '',
+          questionId: n.question_id ?? '',
+          read: n.read,
+          createdAt: n.created_at,
+        }
+      }
+      if (n.type === 'prediction_placed') {
+        return {
+          kind: 'prediction_placed' as const,
+          id: n.id,
+          message: n.message ?? 'ทายเรียบร้อยแล้ว',
           questionId: n.question_id ?? '',
           read: n.read,
           createdAt: n.created_at,
@@ -238,6 +274,7 @@ export default function NotificationBell() {
   return (
     <div className="relative">
       <button
+        id="noti-bell-target"
         onClick={() => { setOpen(o => !o); if (!open) markRepliesRead() }}
         className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors relative"
       >
@@ -296,6 +333,15 @@ export default function NotificationBell() {
                           <div className="flex-1 min-w-0">
                             <p className="text-xs text-gray-900 font-medium">{n.message}</p>
                             <p className="text-xs text-amber-600 font-semibold mt-0.5">+{n.coinsWon.toLocaleString()} คะแนน</p>
+                          </div>
+                          {!n.read && <span className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0 mt-1" />}
+                        </>
+                      ) : n.kind === 'prediction_placed' ? (
+                        <>
+                          <span className="text-lg mt-0.5">🔮</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-gray-900 font-medium">{n.message}</p>
+                            <p className="text-xs text-indigo-500 mt-0.5">กำลังรอผล...</p>
                           </div>
                           {!n.read && <span className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0 mt-1" />}
                         </>
