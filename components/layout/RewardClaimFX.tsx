@@ -360,7 +360,7 @@ export default function RewardClaimFX() {
 export function RewardClaimDevButtons() {
   const claimRef = useRef<HTMLButtonElement>(null)
   const bellRef = useRef<HTMLButtonElement>(null)
-  if (process.env.NODE_ENV !== 'development') return null
+  // show in all envs for manual testing
   return (
     <div className="fixed bottom-24 right-4 z-50 flex flex-col gap-2">
       <button

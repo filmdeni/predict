@@ -93,10 +93,10 @@ export default function ResolvedRewardPopup() {
 
   return (
     <>
-      {process.env.NODE_ENV === 'development' && !reward && (
+      {!reward && (
         <button
           onClick={showMock}
-          className="fixed bottom-24 right-4 z-40 bg-indigo-600 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-lg hover:bg-indigo-700 transition-colors"
+          className="fixed bottom-44 right-4 z-40 bg-indigo-600 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-lg hover:bg-indigo-700 transition-colors"
         >
           🧪 Mock Reward
         </button>

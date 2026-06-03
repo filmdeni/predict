@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { Home, Clock, Trophy, User, PlusCircle, HelpCircle, X } from 'lucide-react'
+import { Home, Clock, Trophy, User, PlusCircle, HelpCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { RANKS } from '@/lib/game/ranks'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
@@ -83,13 +83,12 @@ export default function Sidebar() {
             </Link>
           )
         })}
+
       </nav>
 
       {/* User profile card */}
       {user && profile && (
         <div className="p-3 flex-shrink-0 space-y-2">
-
-          {/* Profile card */}
           <div className="bg-gray-50 rounded-2xl p-3 space-y-2.5">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-sm font-bold text-indigo-700 flex-shrink-0">

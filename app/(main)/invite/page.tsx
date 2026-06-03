@@ -64,6 +64,7 @@ export default function InvitePage() {
   }
 
   const totalCoins = referrals.reduce((s, r) => s + (r.coins_gained ?? 0), 0)
+  const uniqueReferrals = new Set(referrals.map(r => r.ref_user?.display_name ?? r.id)).size
 
   return (
     <div className="max-w-lg mx-auto p-6 space-y-6">
@@ -76,7 +77,7 @@ export default function InvitePage() {
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white border border-gray-200 rounded-2xl p-4 text-center">
           <Users size={20} className="mx-auto text-indigo-400 mb-2" />
-          <p className="text-2xl font-bold text-gray-900">{referrals.length}</p>
+          <p className="text-2xl font-bold text-gray-900">{uniqueReferrals}</p>
           <p className="text-xs text-gray-400">คนที่ชวนมาได้</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-2xl p-4 text-center">

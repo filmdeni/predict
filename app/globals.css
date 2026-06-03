@@ -76,6 +76,56 @@ body {
   animation: cosmic 4s linear infinite;
 }
 
+/* ── Profile page animations ── */
+.aura-ring { animation: aura 2.5s ease-in-out infinite; }
+@keyframes aura {
+  0%,100% { opacity: 0.30; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(1.05); }
+}
+
+.cosmic-bg {
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(111,75,255,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 80%, rgba(75,57,117,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 0%,  rgba(111,75,255,0.05) 0%, transparent 50%);
+}
+
+.legend-pulse { animation: legendPulse 2.5s ease-in-out infinite; }
+@keyframes legendPulse {
+  0%,100% { box-shadow: 0 0 20px rgba(212,128,255,0.4), 0 0 60px rgba(212,128,255,0.15); }
+  50%      { box-shadow: 0 0 35px rgba(212,128,255,0.6), 0 0 80px rgba(212,128,255,0.25); }
+}
+
+.card-hover { transition: all 0.28s cubic-bezier(0.22,1,0.36,1); }
+.card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(111,75,255,0.15); }
+
+.coin-bounce { animation: coinBounce 1.8s ease-in-out infinite; }
+@keyframes coinBounce {
+  0%,100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-4px) rotate(8deg); }
+}
+
+.glow-gold { box-shadow: 0 0 20px rgba(215,181,109,0.35), 0 0 60px rgba(215,181,109,0.12); }
+.glow-text-gold { text-shadow: 0 0 16px rgba(215,181,109,0.30); }
+.gradient-gold {
+  background: linear-gradient(135deg, #C89B4F, #D7B56D, #C89B4F);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.glass-gold {
+  background: rgba(20,17,31,0.92);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(215,181,109,0.20);
+}
+
+.glass {
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
 @keyframes ticker-scroll-y {
   from { transform: translateY(0); }
   to   { transform: translateY(-50%); }

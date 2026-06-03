@@ -165,7 +165,7 @@ export default function QuestionPageClient() {
   const sidebarGroup = hasSidebar ? ALL_GROUPS.find(g => g.slug === activeParent) : null
 
   const content = (
-    <div className="max-w-2xl mx-auto md:mx-0 p-6 space-y-5 w-full">
+    <div className="max-w-2xl mx-auto p-6 space-y-5 w-full">
       {/* back + share */}
       <div className="flex items-center justify-between">
         <button
@@ -449,11 +449,11 @@ export default function QuestionPageClient() {
 
         {/* pool bar */}
         <div className="px-4 pb-4 space-y-2.5">
-          {question.status === 'open' ? (
-            /* Blind pool: hide community distribution while open */
+          {question.status === 'open' && activeParent !== 'politics' ? (
+            /* Blind pool: hide community distribution while open (except politics) */
             <div className="flex items-center gap-2 py-1">
               <Lock size={13} className="text-gray-400 flex-shrink-0" />
-              <span className="text-xs text-gray-400">สัดส่วนเปิดเผยหลังปิดรับทาย</span>
+              <span className="text-xs text-gray-400">ผลทายของชุมชนจะเห็นได้หลังปิดรับ</span>
             </div>
           ) : (
             <div className="space-y-1">
@@ -461,11 +461,13 @@ export default function QuestionPageClient() {
               <div className="flex h-2 rounded-full overflow-hidden gap-0.5">
                 {options.map((opt, i) => {
                   const colors = ['bg-green-400', 'bg-blue-400', 'bg-orange-400', 'bg-purple-400']
+                  const equalShare = 100 / options.length
+                  const pct = (shares[opt.id] ?? 0) > 0 ? (shares[opt.id] ?? 0) : equalShare
                   return (
                     <div
                       key={opt.id}
                       className={`${colors[i % colors.length]} transition-all duration-500`}
-                      style={{ width: `${shares[opt.id] ?? 0}%` }}
+                      style={{ width: `${pct}%` }}
                     />
                   )
                 })}
@@ -473,6 +475,7 @@ export default function QuestionPageClient() {
               <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
                 {options.map((opt, i) => {
                   const dotColors = ['bg-green-400', 'bg-blue-400', 'bg-orange-400', 'bg-purple-400']
+                  const hasData = Object.values(shares).some(v => v > 0)
                   return (
                     <div key={opt.id} className="flex items-center gap-1">
                       {opt.icon_url ? (
@@ -482,7 +485,9 @@ export default function QuestionPageClient() {
                         <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${dotColors[i % dotColors.length]}`} />
                       )}
                       <span className="text-xs text-gray-500">{opt.label}</span>
-                      <span className="text-xs font-bold text-gray-900">{(shares[opt.id] ?? 0).toFixed(0)}%</span>
+                      <span className="text-xs font-bold text-gray-900">
+                        {hasData ? `${(shares[opt.id] ?? 0).toFixed(0)}%` : '-'}
+                      </span>
                     </div>
                   )
                 })}
@@ -533,8 +538,8 @@ export default function QuestionPageClient() {
           </span>
         </div>
 
-        {/* Probability trend chart — only after closed */}
-        {options.length > 3 && question.status !== 'open' && (
+        {/* Probability trend chart — only after closed (except politics: always visible) */}
+        {options.length > 3 && (question.status !== 'open' || activeParent === 'politics') && (
           <div className="px-4 pb-4">
             <ProbabilityChart
               questionId={id}

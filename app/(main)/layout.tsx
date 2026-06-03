@@ -6,10 +6,12 @@ import ResolvedRewardPopup from '@/components/layout/ResolvedRewardPopup'
 import RewardClaimFX, { RewardClaimDevButtons } from '@/components/layout/RewardClaimFX'
 import ToastContainer from '@/components/ui/Toast'
 import HowToPlayModal from '@/components/layout/HowToPlayModal'
+import TermsModal from '@/components/layout/TermsModal'
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[#f5f5f5]">
+      <TermsModal />
       <DailyBonusProvider />
       <ResolvedRewardPopup />
       <RewardClaimFX />
