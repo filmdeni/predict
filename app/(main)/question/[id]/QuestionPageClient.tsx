@@ -56,6 +56,12 @@ export default function QuestionPageClient() {
   const [user, setUser] = useState<User | null>(null)
   const [trendingOption, setTrendingOption] = useState<{ id: string; label: string; delta: number } | null>(null)
   const [myPrediction, setMyPrediction] = useState<{ option_id: string; coins_wagered: number; is_correct: boolean | null; coins_won: number | null } | null>(null)
+  const [matchPreview, setMatchPreview] = useState<{
+    marketOdds: { home: number; away: number; draw: number | null } | null
+    venueInfo: { name: string | null; city: string | null; capacity: number | null } | null
+    articles: { headline: string; url: string }[]
+    h2h: { team: string; wins: string; losses: string; ties: string }[]
+  } | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -115,6 +121,19 @@ export default function QuestionPageClient() {
 
     return () => { supabase.removeChannel(channel) }
   }, [id])
+
+  useEffect(() => {
+    if (!question) return
+    try {
+      const meta = JSON.parse(question.description ?? '{}')
+      if (meta.type === 'sports' && meta.event_id && meta.league && !meta.weight_class) {
+        fetch(`/api/sports/match-preview?event=${meta.event_id}&league=${meta.league}`)
+          .then(r => r.json())
+          .then(d => { if (!d.error) setMatchPreview(d) })
+          .catch(() => {})
+      }
+    } catch {}
+  }, [question?.id])
 
   if (loading) {
     return (
@@ -252,16 +271,59 @@ export default function QuestionPageClient() {
                       {meta.tournament && (
                         <p className="text-xs text-gray-400">{meta.tournament}{meta.format ? ` · Bo${meta.number_of_games}` : ''}</p>
                       )}
-                      {meta.stream_url && (
-                        <a href={meta.stream_url} target="_blank" rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-purple-600 font-medium hover:underline">
-                          🎮 ดูสด
-                        </a>
-                      )}
+                      {meta.stream_url && (() => {
+                        const url = meta.stream_url as string
+                        const isTwitch = url.includes('twitch.tv')
+                        const isYouTube = url.includes('youtube.com') || url.includes('youtu.be')
+                        const platform = isTwitch ? 'Twitch' : isYouTube ? 'YouTube' : 'Live'
+                        const platformColor = isTwitch ? 'text-purple-600' : isYouTube ? 'text-red-500' : 'text-gray-600'
+                        const platformBg = isTwitch ? 'bg-purple-50 border-purple-200' : isYouTube ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'
+                        const d = new Date(question.closes_at)
+                        const timeStr = d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+                        const dateStr = `${d.getDate()} ${['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][d.getMonth()]}`
+                        return (
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border ${platformBg} hover:opacity-80 transition-opacity`}
+                          >
+                            {isTwitch && (
+                              <svg className="w-3.5 h-3.5 text-purple-600 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
+                              </svg>
+                            )}
+                            {isYouTube && (
+                              <svg className="w-3.5 h-3.5 text-red-500 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                              </svg>
+                            )}
+                            {!isTwitch && !isYouTube && <span className="text-xs">🎮</span>}
+                            <div className="flex flex-col leading-tight">
+                              <span className={`text-[11px] font-bold ${platformColor}`}>{platform} · ดูสด</span>
+                              <span className="text-[10px] text-gray-400">เริ่ม {timeStr} · {dateStr}</span>
+                            </div>
+                          </a>
+                        )
+                      })()}
                     </div>
                   )
                 }
                 if (meta.type === 'sports') {
+                  const isFootball = meta.league && !meta.weight_class && !meta.event_name
+                  if (isFootball) {
+                    const venueName = typeof meta.venue === 'string' ? meta.venue : meta.venue?.fullName
+                    return (
+                      <div className="space-y-1">
+                        {meta.league_name && (
+                          <p className="text-xs text-emerald-600 font-medium">⚽ {meta.league_name}</p>
+                        )}
+                        {venueName && (
+                          <span className="text-xs text-gray-400">📍 {venueName}</span>
+                        )}
+                      </div>
+                    )
+                  }
                   return (
                     <div className="space-y-1.5">
                       {meta.event_name && (
@@ -290,8 +352,38 @@ export default function QuestionPageClient() {
                   )
                 }
                 if (meta.type === 'commodity') {
+                  const fmt = (v: number, decimals = 2) =>
+                    typeof v === 'number' ? (v > 999 ? v.toLocaleString('th-TH') : v.toFixed(decimals)) : '-'
+                  const isStock = !!meta.ticker
+                  const changeAmt = meta.seed_price != null && meta.previous_close != null
+                    ? meta.seed_price - meta.previous_close : null
+                  const changePct = changeAmt != null && meta.previous_close
+                    ? (changeAmt / meta.previous_close) * 100 : null
                   return (
-                    <p className="text-xs text-gray-400">เกณฑ์: {meta.threshold?.toLocaleString('th-TH')} {meta.unit}</p>
+                    <div className="flex flex-col gap-1 text-xs text-gray-400">
+                      <p>เกณฑ์: <span className="font-medium text-gray-600">{fmt(meta.threshold)} {meta.unit}</span></p>
+                      {meta.seed_price != null && (
+                        <p>ราคาล่าสุด: <span className="font-medium text-gray-600">{fmt(meta.seed_price)} {meta.unit}</span>
+                          {changePct != null && (
+                            <span className={`ml-1 font-medium ${changePct >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                              {changePct >= 0 ? '+' : ''}{changePct.toFixed(2)}%
+                            </span>
+                          )}
+                        </p>
+                      )}
+                      {isStock && meta.previous_close != null && (
+                        <p>ปิดเมื่อวาน: <span className="font-medium text-gray-600">${fmt(meta.previous_close)}</span></p>
+                      )}
+                      {isStock && meta.day_high != null && meta.day_low != null && (
+                        <p>สูง/ต่ำวันนี้: <span className="font-medium text-gray-600">${fmt(meta.day_high)} / ${fmt(meta.day_low)}</span></p>
+                      )}
+                      {isStock && meta.week52_high != null && meta.week52_low != null && (
+                        <p>52W High/Low: <span className="font-medium text-gray-600">${fmt(meta.week52_high)} / ${fmt(meta.week52_low)}</span></p>
+                      )}
+                      {isStock && meta.volume != null && (
+                        <p>Volume: <span className="font-medium text-gray-600">{Number(meta.volume).toLocaleString('en-US')}</span></p>
+                      )}
+                    </div>
                   )
                 }
                 return null
@@ -311,7 +403,12 @@ export default function QuestionPageClient() {
           </div>
           {question.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={question.image_url} alt="" className="w-32 h-36 rounded-xl object-cover flex-shrink-0" />
+            <img
+              src={question.image_url}
+              alt=""
+              className="w-32 h-36 rounded-xl object-cover flex-shrink-0"
+              onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+            />
           )}
         </div>
 
@@ -504,6 +601,24 @@ export default function QuestionPageClient() {
           <p className="text-green-700 font-semibold">
             ✅ ผลลัพธ์: {options.find(o => o.id === question.correct_option)?.label}
           </p>
+        </div>
+      )}
+
+      {/* Football match preview — news only */}
+      {matchPreview?.articles && matchPreview.articles.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-2">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">ข่าวล่าสุด</p>
+          {matchPreview.articles.map((a, i) => (
+            <a
+              key={i}
+              href={a.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-sm text-gray-700 hover:text-indigo-600 leading-snug border-b border-gray-50 last:border-0 pb-2 last:pb-0 transition-colors"
+            >
+              📰 {a.headline}
+            </a>
+          ))}
         </div>
       )}
 

@@ -54,12 +54,12 @@ export default function Sidebar() {
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-56 bg-white border-r border-gray-100 flex-col z-30 hidden md:flex">
       {/* Logo */}
-      <div className="px-5 py-5 flex-shrink-0">
-        <Link href="/feed" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-sm">
-            <span className="text-white font-black text-sm">ภ</span>
-          </div>
-          <span className="font-bold text-gray-900 text-lg tracking-tight">ภาวนา</span>
+      <div className="px-5 py-4 flex-shrink-0">
+        <Link href="/feed" className="flex flex-col">
+          <span className="text-2xl font-black tracking-tight leading-tight">
+            <span className="text-indigo-600">ภา</span><span className="text-gray-900">วนา</span>
+          </span>
+          <span className="text-[10px] font-medium tracking-widest text-gray-400">แพลตฟอร์มทายผลเหตุการณ์</span>
         </Link>
       </div>
 

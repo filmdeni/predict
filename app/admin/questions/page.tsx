@@ -37,6 +37,7 @@ export default function AdminQuestionsPage() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<TabKey>('all')
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [resolveModal, setResolveModal] = useState<Question | null>(null)
   const [resolveOption, setResolveOption] = useState<string>('')
   const [resolving, setResolving] = useState(false)
@@ -96,7 +97,13 @@ export default function AdminQuestionsPage() {
     setConfirmDelete(null)
   }
 
-  const filtered = tab === 'all' ? questions : questions.filter(q => q.status === tab)
+  const categories = Array.from(
+    new Map(questions.map(q => [q.categories.name_th, q.categories])).values()
+  ).sort((a, b) => a.name_th.localeCompare(b.name_th, 'th'))
+
+  const filtered = questions
+    .filter(q => tab === 'all' || q.status === tab)
+    .filter(q => categoryFilter === 'all' || q.categories.name_th === categoryFilter)
 
   return (
     <div className="p-6 space-y-5">
@@ -139,6 +146,36 @@ export default function AdminQuestionsPage() {
           )
         })}
       </div>
+
+      {/* Category Filter */}
+      {categories.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs text-gray-400 font-medium mr-1">หมวด:</span>
+          <button
+            onClick={() => setCategoryFilter('all')}
+            className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${
+              categoryFilter === 'all'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-400'
+            }`}
+          >
+            ทั้งหมด
+          </button>
+          {categories.map(cat => (
+            <button
+              key={cat.name_th}
+              onClick={() => setCategoryFilter(cat.name_th)}
+              className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${
+                categoryFilter === cat.name_th
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-400'
+              }`}
+            >
+              {cat.emoji} {cat.name_th}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">

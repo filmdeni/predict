@@ -3,7 +3,7 @@ import './globals.css'
 import { PageTracker } from '@/components/PageTracker'
 
 export const metadata: Metadata = {
-  title: 'ฟันธง — Social Forecasting',
+  title: 'ภาวนา — Social Forecasting',
   description: 'ทายผลเหตุการณ์ แข่งกันด้วยสกิล ไม่มีเงินจริง',
   manifest: '/manifest.json',
 }

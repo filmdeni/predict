@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Globe, Landmark, TrendingUp, Users, Star, Gamepad2, Trophy, Bitcoin } from 'lucide-react'
+import { Globe, Landmark, TrendingUp, Star, Gamepad2, Trophy, Bitcoin } from 'lucide-react'
 
 export const PARENT_SUBS: Record<string, string[]> = {
   esports: ['esports', 'dota2', 'cs2', 'mlbb', 'valorant', 'lol'],
@@ -15,7 +15,6 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   all:      <Globe     size={14} strokeWidth={1.75} />,
   politics: <Landmark  size={14} strokeWidth={1.75} />,
   crypto:   <Bitcoin   size={14} strokeWidth={1.75} />,
-  drama:    <Users     size={14} strokeWidth={1.75} />,
   stock:    <TrendingUp size={14} strokeWidth={1.75} />,
   viral:    <Star      size={14} strokeWidth={1.75} />,
   esports:  <Gamepad2  size={14} strokeWidth={1.75} />,
@@ -26,7 +25,6 @@ export const ALL_GROUPS = [
   { slug: 'all',      name: 'ทั้งหมด',  subs: [] },
   { slug: 'politics', name: 'การเมือง', subs: [] },
   { slug: 'crypto',   name: 'Crypto',   subs: [] },
-  { slug: 'drama',    name: 'ดราม่า',   subs: [] },
   { slug: 'stock',    name: 'หุ้น',     subs: [] },
   { slug: 'viral',    name: 'ไวรัล',   subs: [] },
   {

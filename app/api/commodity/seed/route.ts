@@ -48,6 +48,56 @@ function roundToStep(value: number, step: number): number {
   return Math.round(value / step) * step
 }
 
+const US_STOCKS = [
+  { ticker: 'NVDA',  label: 'Nvidia',    step: 5,   logo: 'https://www.google.com/s2/favicons?sz=64&domain=nvidia.com' },
+  { ticker: 'AAPL',  label: 'Apple',     step: 5,   logo: 'https://www.google.com/s2/favicons?sz=64&domain=apple.com' },
+  { ticker: 'MSFT',  label: 'Microsoft', step: 5,   logo: 'https://www.google.com/s2/favicons?sz=64&domain=microsoft.com' },
+  { ticker: 'TSLA',  label: 'Tesla',     step: 10,  logo: 'https://www.google.com/s2/favicons?sz=64&domain=tesla.com' },
+  { ticker: 'AMZN',  label: 'Amazon',    step: 5,   logo: 'https://www.google.com/s2/favicons?sz=64&domain=amazon.com' },
+  { ticker: 'META',  label: 'Meta',      step: 5,   logo: 'https://www.google.com/s2/favicons?sz=64&domain=meta.com' },
+  { ticker: 'GOOGL', label: 'Google',    step: 5,   logo: 'https://www.google.com/s2/favicons?sz=64&domain=google.com' },
+]
+
+interface StockQuote {
+  price: number
+  previousClose: number
+  dayHigh: number
+  dayLow: number
+  week52High: number
+  week52Low: number
+  volume: number
+  name: string
+}
+
+async function fetchStockQuote(ticker: string): Promise<StockQuote> {
+  const res = await fetch(
+    `https://query2.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=5d`,
+    { headers: { 'User-Agent': 'Mozilla/5.0' }, next: { revalidate: 0 } }
+  )
+  if (!res.ok) throw new Error(`Yahoo Finance error for ${ticker}: ${res.status}`)
+  const data = await res.json()
+  const meta = data.chart.result[0].meta
+  return {
+    price: meta.regularMarketPrice,
+    previousClose: meta.chartPreviousClose,
+    dayHigh: meta.regularMarketDayHigh,
+    dayLow: meta.regularMarketDayLow,
+    week52High: meta.fiftyTwoWeekHigh,
+    week52Low: meta.fiftyTwoWeekLow,
+    volume: meta.regularMarketVolume,
+    name: meta.shortName ?? ticker,
+  }
+}
+
+function isUSMarketOpen(): boolean {
+  const now = new Date()
+  // NYSE: Mon-Fri 09:30-16:00 ET (13:30-20:00 UTC)
+  const dayUTC = now.getUTCDay() // 0=Sun, 6=Sat
+  if (dayUTC === 0 || dayUTC === 6) return false
+  const hUTC = now.getUTCHours() * 60 + now.getUTCMinutes()
+  return hUTC >= 13 * 60 + 30 && hUTC < 20 * 60
+}
+
 async function seedMockPredictions(questionId: string, currentPrice: number, threshold: number) {
   // Bots lean slightly toward the more likely side based on current price vs threshold
   const leanYes = currentPrice >= threshold ? 0.65 : 0.35
@@ -137,6 +187,7 @@ async function handler(req: Request) {
           type: 'commodity', commodity: 'gold',
           threshold, unit: 'บาท/บาทหนัก', seed_price: goldPrice,
         }),
+        image_url: 'https://www.google.com/s2/favicons?sz=64&domain=gold.org',
         options: [
           { id: 'yes', label: `ใช่ สูงกว่า ${threshold.toLocaleString('th-TH')} บาท` },
           { id: 'no',  label: `ไม่ถึง ต่ำกว่า ${threshold.toLocaleString('th-TH')} บาท` },
@@ -178,6 +229,7 @@ async function handler(req: Request) {
           type: 'commodity', commodity: 'oil_wti',
           threshold, unit: 'USD/barrel', seed_price: oilPrice,
         }),
+        image_url: 'https://www.google.com/s2/favicons?sz=64&domain=cmegroup.com',
         options: [
           { id: 'yes', label: `ใช่ สูงกว่า $${threshold.toFixed(2)}` },
           { id: 'no',  label: `ไม่ถึง ต่ำกว่า $${threshold.toFixed(2)}` },
@@ -194,6 +246,66 @@ async function handler(req: Request) {
     }
   } catch (err) {
     results.push({ type: 'oil', error: String(err) })
+  }
+
+  // ---- US Stocks ----
+  // Only seed on weekdays; skip if market is closed (weekend)
+  const dayUTC = now.getUTCDay()
+  if (dayUTC !== 0 && dayUTC !== 6) {
+    // US market closes 20:00 UTC — question closes then
+    const stockClosesAt = new Date(now)
+    stockClosesAt.setUTCHours(20, 0, 0, 0)
+    if (stockClosesAt <= now) stockClosesAt.setUTCDate(stockClosesAt.getUTCDate() + 1)
+
+    for (const stock of US_STOCKS) {
+      try {
+        if (await alreadySeededToday(`stock_${stock.ticker}`)) {
+          results.push({ type: stock.ticker, skipped: 'already seeded today' })
+          continue
+        }
+
+        const quote = await fetchStockQuote(stock.ticker)
+        const threshold = roundToStep(quote.price, stock.step)
+
+        const { data: q, error } = await supabase
+          .from('questions')
+          .insert({
+            category_id: 3,
+            created_by: BOT_USER_IDS[0],
+            title: `${stock.label} (${stock.ticker}) ${dateLabel} ราคาปิดจะสูงกว่า $${threshold.toFixed(2)} ไหม?`,
+            description: JSON.stringify({
+              type: 'commodity',
+              commodity: `stock_${stock.ticker}`,
+              ticker: stock.ticker,
+              name: quote.name,
+              threshold,
+              unit: 'USD',
+              seed_price: quote.price,
+              previous_close: quote.previousClose,
+              day_high: quote.dayHigh,
+              day_low: quote.dayLow,
+              week52_high: quote.week52High,
+              week52_low: quote.week52Low,
+              volume: quote.volume,
+            }),
+            image_url: stock.logo,
+            options: [
+              { id: 'yes', label: `ใช่ สูงกว่า $${threshold.toFixed(2)}` },
+              { id: 'no',  label: `ไม่ถึง ต่ำกว่า $${threshold.toFixed(2)}` },
+            ],
+            closes_at: stockClosesAt.toISOString(),
+            card_style: 'gauge',
+          })
+          .select('id')
+          .single()
+
+        if (error) throw error
+        await seedMockPredictions(q.id, quote.price, threshold)
+        results.push({ type: stock.ticker, question_id: q.id, price: quote.price, threshold })
+      } catch (err) {
+        results.push({ type: stock.ticker, error: String(err) })
+      }
+    }
   }
 
   return NextResponse.json({ ok: true, results })

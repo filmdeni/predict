@@ -100,7 +100,11 @@ export default function QuestionCard({ question, initialSaved = false, isPredict
   const options = question.options as { id: string; label: string; icon_url?: string | null }[]
   const cardStyle = question.card_style ?? 'auto'
   const isRows = cardStyle === 'rows'
-  const isBinary = !isRows && (cardStyle === 'gauge' || (cardStyle === 'auto' && options.length === 2))
+
+  const sportsMeta = (() => { try { const m = JSON.parse(question.description ?? '{}'); return m.type === 'sports' ? m : null } catch { return null } })()
+  const isFootball = cardStyle === 'football' || !!(sportsMeta && sportsMeta.league && !sportsMeta.weight_class && !sportsMeta.event_name)
+
+  const isBinary = !isRows && !isFootball && (cardStyle === 'gauge' || (cardStyle === 'auto' && options.length === 2))
   const topPct = shares[options[0]?.id ?? ''] ?? 0
 
   const [saved, setSaved] = useState(initialSaved)
@@ -108,7 +112,13 @@ export default function QuestionCard({ question, initialSaved = false, isPredict
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const t = requestAnimationFrame(() => setMounted(true))
+    return () => cancelAnimationFrame(t)
+  }, [])
 
   useEffect(() => {
     if (!menuOpen) return
@@ -188,7 +198,7 @@ export default function QuestionCard({ question, initialSaved = false, isPredict
 
   return (
     <Link href={`/question/${question.id}`}>
-      <article className={`relative bg-white border rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer h-full flex flex-col gap-3 ${borderClass}`}>
+      <article className={`relative bg-white border rounded-xl p-4 cursor-pointer h-full flex flex-col gap-3 card-lift ${borderClass}`}>
         {/* LIVE badge — top left */}
         {isLive && (
           <span className="absolute top-2.5 left-2.5 flex items-center gap-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none z-10">
@@ -286,20 +296,86 @@ export default function QuestionCard({ question, initialSaved = false, isPredict
         <div className="flex gap-3">
           {question.image_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={question.image_url} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+            <img
+              src={question.image_url}
+              alt=""
+              className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+              onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+            />
           ) : (
             <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-xl flex-shrink-0">
               {question.categories.emoji}
             </div>
           )}
-          <h2 className="text-sm font-semibold text-gray-900 leading-snug line-clamp-3 flex-1">
-            {question.title}
-          </h2>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-sm font-semibold text-gray-900 leading-snug line-clamp-3">
+              {question.title}
+            </h2>
+            {isFootball && sportsMeta?.league_name && (
+              <p className="text-[10px] text-emerald-600 font-medium mt-0.5">{sportsMeta.league_name}</p>
+            )}
+          </div>
         </div>
 
         {/* options */}
         <div className="flex-1">
-          {isRows ? (
+          {isFootball && options.length >= 2 ? (() => {
+            const [optA, optB, optDraw] = options
+            const pctA = shares[optA.id] ?? 0
+            const pctB = shares[optB.id] ?? 0
+            const pctDraw = optDraw ? (shares[optDraw.id] ?? 0) : 0
+            const winnerSide = pctA >= pctB ? 'a' : 'b'
+            return (
+              <div className="space-y-2">
+                {/* VS row */}
+                <div className="flex items-center gap-2">
+                  {/* Team A */}
+                  <div className={`flex-1 flex flex-col items-center gap-1 p-2 rounded-xl border transition-colors ${winnerSide === 'a' ? 'border-emerald-200 bg-emerald-50/50' : 'border-gray-100 bg-gray-50/50'}`}>
+                    {optA.icon_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={optA.icon_url} alt="" className="w-8 h-8 rounded-md object-contain" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-md bg-emerald-100 flex items-center justify-center text-xs font-bold text-emerald-700">
+                        {optA.label[0]}
+                      </div>
+                    )}
+                    <span className="text-[11px] text-gray-700 font-medium text-center leading-tight line-clamp-1 w-full">{optA.label}</span>
+                    <span className={`text-sm font-bold ${winnerSide === 'a' ? 'text-emerald-600' : 'text-gray-600'}`}>{pctA.toFixed(0)}%</span>
+                  </div>
+
+                  {/* VS */}
+                  <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
+                    <span className="text-[10px] font-black text-gray-300">VS</span>
+                  </div>
+
+                  {/* Team B */}
+                  <div className={`flex-1 flex flex-col items-center gap-1 p-2 rounded-xl border transition-colors ${winnerSide === 'b' ? 'border-blue-200 bg-blue-50/50' : 'border-gray-100 bg-gray-50/50'}`}>
+                    {optB.icon_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={optB.icon_url} alt="" className="w-8 h-8 rounded-md object-contain" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-md bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-700">
+                        {optB.label[0]}
+                      </div>
+                    )}
+                    <span className="text-[11px] text-gray-700 font-medium text-center leading-tight line-clamp-1 w-full">{optB.label}</span>
+                    <span className={`text-sm font-bold ${winnerSide === 'b' ? 'text-blue-600' : 'text-gray-600'}`}>{pctB.toFixed(0)}%</span>
+                  </div>
+                </div>
+
+                {/* Draw bar */}
+                {optDraw && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-400 flex-shrink-0 w-8 text-right">เสมอ</span>
+                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-amber-300 rounded-full transition-all duration-700" style={{ width: mounted ? `${pctDraw}%` : '0%' }} />
+                    </div>
+                    <span className="text-[10px] font-semibold text-gray-500 flex-shrink-0 w-8">{pctDraw.toFixed(0)}%</span>
+                  </div>
+                )}
+              </div>
+            )
+          })() : isRows ? (
             <div className="space-y-1.5">
               {options.slice(0, 4).map((opt, i) => {
                 const bgColors = ['bg-green-400/15', 'bg-blue-400/15', 'bg-orange-400/15', 'bg-purple-400/15']
@@ -311,7 +387,7 @@ export default function QuestionCard({ question, initialSaved = false, isPredict
                     {/* background fill bar */}
                     <div
                       className={`absolute inset-y-0 left-0 ${barColors[i % barColors.length]} opacity-20 transition-all duration-700`}
-                      style={{ width: `${pct}%` }}
+                      style={{ width: mounted ? `${pct}%` : '0%' }}
                     />
                     <div className={`relative flex items-center gap-2 px-2 py-1.5 ${bgColors[i % bgColors.length]} rounded-lg`}>
                       {opt.icon_url ? (
@@ -364,7 +440,7 @@ export default function QuestionCard({ question, initialSaved = false, isPredict
                       <span className="text-xs font-bold text-gray-900 flex-shrink-0">{pct.toFixed(0)}%</span>
                     </div>
                     <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-                      <div className={`h-full ${colors[i % colors.length]} rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
+                      <div className={`h-full ${colors[i % colors.length]} rounded-full transition-all duration-700`} style={{ width: mounted ? `${pct}%` : '0%' }} />
                     </div>
                   </div>
                 )

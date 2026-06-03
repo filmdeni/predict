@@ -34,7 +34,7 @@ export default function SubmitQuestionPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace('/login'); return }
 
-      const { data } = await supabase.from('categories').select('id, name_th, emoji').order('sort_order')
+      const { data } = await (supabase.from('categories') as any).select('id, name_th, emoji, is_active, sort_order').eq('is_active', true).order('sort_order')
       const cats = (data ?? []) as { id: number; name_th: string; emoji: string }[]
       setCategories(cats)
       if (cats[0]) setCategoryId(cats[0].id)

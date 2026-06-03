@@ -71,11 +71,6 @@ function DraggableGrid({
           ].join(' ')}
           style={{ animationDelay: `${i * 40}ms` }}
         >
-          {pinnedHeroId && q.id === pinnedHeroId && (
-            <div className="absolute -top-2 left-3 z-10">
-              <span className="text-[10px] text-yellow-700 bg-yellow-100 border border-yellow-300 px-2 py-0.5 rounded-full font-medium">🌟 คำถามประจำวัน</span>
-            </div>
-          )}
           <QuestionCard
             question={q}
             isAdmin={isAdmin}
@@ -323,7 +318,7 @@ function HeroBanner({ stats, tickKey }: {
         <h1 className="text-3xl md:text-4xl font-black leading-tight text-slate-800">
           ใครจะ<span className="text-indigo-600">ทายแม่น</span>ที่สุด?
         </h1>
-        <p className="text-sm text-slate-600 mt-2">ร่วมลุ้น ฟันธง และพิสูจน์ว่าคุณอ่านอนาคตออก</p>
+        <p className="text-sm text-slate-600 mt-2">ร่วมลุ้น ทาย และพิสูจน์ว่าคุณอ่านอนาคตออก</p>
 
         <div className="flex flex-wrap gap-6 mt-6">
           <div className="flex items-center gap-2">
@@ -544,10 +539,11 @@ export default function FeedPage() {
       const { data: visData } = await supabase.from('category_visibility').select('slug').eq('hidden', true)
       const hiddenSlugs = (visData ?? []).map(r => r.slug)
 
+      const now = new Date().toISOString()
       let query = supabase
         .from('questions')
         .select('*, categories(name_th, emoji, slug)')
-        .in('status', ['open', 'closed', 'resolved'])
+        .or(`status.in.(closed,resolved),and(status.eq.open,closes_at.gt.${now})`)
         .order('closes_at', { ascending: true })
         .limit(50)
 

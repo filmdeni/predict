@@ -16,52 +16,29 @@ const BOT_USER_IDS = new Set([
   '00000000-0000-0000-0001-000000000005',
 ])
 
-async function fetchGoldPricePerBahtWeight(): Promise<number> {
-  const headers = { 'User-Agent': 'Mozilla/5.0' }
-  const [goldRes, fxRes] = await Promise.all([
-    fetch('https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1d&range=1d', { headers, next: { revalidate: 0 } }),
-    fetch('https://query1.finance.yahoo.com/v8/finance/chart/USDTHB=X?interval=1d&range=1d', { headers, next: { revalidate: 0 } }),
-  ])
-  if (!goldRes.ok) throw new Error(`Gold fetch error: ${goldRes.status}`)
-  if (!fxRes.ok) throw new Error(`FX fetch error: ${fxRes.status}`)
-  const goldData = await goldRes.json()
-  const fxData = await fxRes.json()
-  const ozPriceUSD: number = goldData.chart.result[0].meta.regularMarketPrice
-  const usdThb: number = fxData.chart.result[0].meta.regularMarketPrice
-  return Math.round(ozPriceUSD * usdThb * (15.244 / 31.1035))
+// Query GDELT for Thai news matching keywords (last 24h)
+async function checkGDELT(keywords: string[]): Promise<boolean> {
+  // GDELT GKG API: search for articles in Thai sources mentioning keywords
+  // Uses the free GDELT 2.0 DOC API
+  const query = keywords.map(k => `"${k}"`).join(' OR ')
+  const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(query + ' sourcelang:thai OR sourcelang:english domain:.th')}&mode=artlist&maxrecords=5&timespan=1440&format=json`
+
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      next: { revalidate: 0 },
+    })
+    if (!res.ok) return false
+    const data = await res.json()
+    return (data.articles?.length ?? 0) > 0
+  } catch {
+    return false
+  }
 }
 
-async function fetchOilWTI(): Promise<number> {
-  const res = await fetch(
-    'https://query1.finance.yahoo.com/v8/finance/chart/CL=F?interval=1d&range=1d',
-    { headers: { 'User-Agent': 'Mozilla/5.0' }, next: { revalidate: 0 } }
-  )
-  if (!res.ok) throw new Error(`Yahoo Finance error: ${res.status}`)
-  const data = await res.json()
-  return data.chart.result[0].meta.regularMarketPrice as number
-}
-
-async function fetchStockPrice(ticker: string): Promise<number> {
-  const res = await fetch(
-    `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`,
-    { headers: { 'User-Agent': 'Mozilla/5.0' }, next: { revalidate: 0 } }
-  )
-  if (!res.ok) throw new Error(`Yahoo Finance error for ${ticker}: ${res.status}`)
-  const data = await res.json()
-  return data.chart.result[0].meta.regularMarketPrice as number
-}
-
-async function getCurrentPrice(commodity: string): Promise<number> {
-  if (commodity === 'gold') return fetchGoldPricePerBahtWeight()
-  if (commodity === 'oil_wti') return fetchOilWTI()
-  if (commodity.startsWith('stock_')) return fetchStockPrice(commodity.replace('stock_', ''))
-  throw new Error(`Unknown commodity: ${commodity}`)
-}
-
-async function resolveQuestion(questionId: string, correctOption: string, finalPrice: number) {
+async function resolveQuestion(questionId: string, correctOption: string, foundKeyword: boolean) {
   const now = new Date().toISOString()
 
-  // Fetch all predictions for this question
   const { data: preds, error: predsErr } = await supabase
     .from('predictions')
     .select('id, user_id, option_id, coins_wagered')
@@ -75,10 +52,9 @@ async function resolveQuestion(questionId: string, correctOption: string, finalP
       correct_option: correctOption,
       resolved_at: now,
     }).eq('id', questionId)
-    return { resolved: 0, paid: 0, final_price: finalPrice }
+    return { resolved: 0, paid: 0, found_news: foundKeyword }
   }
 
-  // Fetch pool
   const { data: q } = await supabase
     .from('questions')
     .select('pool, total_pool')
@@ -88,7 +64,6 @@ async function resolveQuestion(questionId: string, correctOption: string, finalP
   const pool: Record<string, number> = (q?.pool as Record<string, number>) ?? {}
   const totalPool: number = q?.total_pool ?? 0
   const winnerPool: number = pool[correctOption] ?? 0
-
   let totalPaid = 0
 
   for (const pred of preds) {
@@ -106,7 +81,6 @@ async function resolveQuestion(questionId: string, correctOption: string, finalP
       repDelta = -3
     }
 
-    // Update prediction record
     await supabase.from('predictions').update({
       is_correct: isCorrect,
       coins_won: coinsWon,
@@ -114,11 +88,9 @@ async function resolveQuestion(questionId: string, correctOption: string, finalP
       resolved_at: now,
     }).eq('id', pred.id)
 
-    // Skip coin/rep updates for bots
     if (isBot) continue
 
     if (isCorrect && coinsWon > 0) {
-      // Fetch current user coins
       const { data: user } = await supabase
         .from('users')
         .select('coins, reputation, correct_predictions, total_predictions, win_streak, best_streak')
@@ -130,8 +102,6 @@ async function resolveQuestion(questionId: string, correctOption: string, finalP
       const net = coinsWon - pred.coins_wagered
       const newCoins = user.coins + net
       const newRep = parseFloat((Number(user.reputation) + repDelta).toFixed(2))
-      const newCorrect = user.correct_predictions + 1
-      const newTotal = user.total_predictions // already counted at prediction time
       const newStreak = user.win_streak + 1
       const newBest = Math.max(user.best_streak, newStreak)
       const newRank = getRank(newRep)
@@ -139,7 +109,7 @@ async function resolveQuestion(questionId: string, correctOption: string, finalP
       await supabase.from('users').update({
         coins: newCoins,
         reputation: newRep,
-        correct_predictions: newCorrect,
+        correct_predictions: user.correct_predictions + 1,
         win_streak: newStreak,
         best_streak: newBest,
         rank: newRank.tier,
@@ -153,7 +123,6 @@ async function resolveQuestion(questionId: string, correctOption: string, finalP
         ref_id: questionId,
       })
 
-      // Notification
       await supabase.from('notifications').insert({
         user_id: pred.user_id,
         type: 'prediction_resolved',
@@ -166,7 +135,6 @@ async function resolveQuestion(questionId: string, correctOption: string, finalP
 
       totalPaid += net
     } else if (!isCorrect) {
-      // Deduct reputation only (coins already deducted at bet time)
       const { data: user } = await supabase
         .from('users')
         .select('reputation')
@@ -191,43 +159,33 @@ async function resolveQuestion(questionId: string, correctOption: string, finalP
         is_correct: false,
         coins_won: 0,
         rep_delta: repDelta,
-        message: `ทายพลาด ราคาจริง: ${finalPrice.toLocaleString('th-TH')}`,
+        message: `ทายพลาด — ${foundKeyword ? 'พบข่าว' : 'ไม่พบข่าว'}ในวันนั้น`,
       })
     }
   }
 
-  // Resolve question
   await supabase.from('questions').update({
     status: 'resolved',
     correct_option: correctOption,
     resolved_at: now,
   }).eq('id', questionId)
 
-  return { resolved: preds.length, paid: totalPaid, final_price: finalPrice }
+  return { resolved: preds.length, paid: totalPaid, found_news: foundKeyword }
 }
 
 function isAuthorized(req: Request): boolean {
-  const auth = req.headers.get('authorization')
-  return auth === `Bearer ${process.env.CRON_SECRET}`
+  return req.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`
 }
 
-export async function GET(req: Request) {
-  return handler(req)
-}
-
-export async function POST(req: Request) {
-  return handler(req)
-}
+export async function GET(req: Request) { return handler(req) }
+export async function POST(req: Request) { return handler(req) }
 
 async function handler(req: Request) {
-  if (!isAuthorized(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  if (!isAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const now = new Date()
   const results: object[] = []
 
-  // Find all open commodity questions that have passed closes_at
   const { data: questions, error } = await supabase
     .from('questions')
     .select('id, description, closes_at')
@@ -236,20 +194,21 @@ async function handler(req: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const commodityQuestions = (questions ?? []).filter(q => {
+  const politicsQuestions = (questions ?? []).filter(q => {
     try {
       const meta = JSON.parse(q.description ?? '{}')
-      return meta.type === 'commodity'
+      return meta.type === 'politics'
     } catch { return false }
   })
 
-  for (const q of commodityQuestions) {
+  for (const q of politicsQuestions) {
     try {
       const meta = JSON.parse(q.description!)
-      const finalPrice = await getCurrentPrice(meta.commodity)
-      const correctOption = finalPrice > meta.threshold ? 'yes' : 'no'
-      const result = await resolveQuestion(q.id, correctOption, finalPrice)
-      results.push({ question_id: q.id, commodity: meta.commodity, ...result })
+      const keywords: string[] = meta.keywords ?? []
+      const foundNews = await checkGDELT(keywords)
+      const correctOption = foundNews ? 'yes' : 'no'
+      const result = await resolveQuestion(q.id, correctOption, foundNews)
+      results.push({ question_id: q.id, template_id: meta.template_id, correct: correctOption, ...result })
     } catch (err) {
       results.push({ question_id: q.id, error: String(err) })
     }

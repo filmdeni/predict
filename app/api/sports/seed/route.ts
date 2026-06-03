@@ -16,13 +16,17 @@ const BOT_USER_IDS = [
 const BOT_WAGERS = [80, 120, 60, 100, 150]
 
 const LEAGUES = [
-  { slug: 'eng.1',   name: 'Premier League', category_id: 22, image: 'https://a.espncdn.com/i/teamlogos/leagues/500/eng.1.png' },
-  { slug: 'esp.1',   name: 'La Liga',        category_id: 22, image: 'https://a.espncdn.com/i/teamlogos/leagues/500/esp.1.png' },
-  { slug: 'tha.1',   name: 'ไทยลีก',         category_id: 22, image: 'https://a.espncdn.com/i/teamlogos/leagues/500/tha.1.png' },
-  { slug: 'fra.1',   name: 'Ligue 1',        category_id: 22, image: 'https://a.espncdn.com/i/teamlogos/leagues/500/fra.1.png' },
-  { slug: 'ger.1',   name: 'Bundesliga',     category_id: 22, image: 'https://a.espncdn.com/i/teamlogos/leagues/500/ger.1.png' },
-  { slug: 'ita.1',   name: 'Serie A',        category_id: 22, image: 'https://a.espncdn.com/i/teamlogos/leagues/500/ita.1.png' },
-  { slug: 'uefa.champions_league', name: 'UCL', category_id: 22, image: 'https://a.espncdn.com/i/teamlogos/leagues/500/uefa.champions_league.png' },
+  { slug: 'eng.1',   name: 'Premier League', category_id: 22, image: 'https://a.espncdn.com/i/leaguelogos/soccer/500/23.png' },
+  { slug: 'esp.1',   name: 'La Liga',        category_id: 22, image: 'https://a.espncdn.com/i/leaguelogos/soccer/500/15.png' },
+  { slug: 'tha.1',   name: 'ไทยลีก',         category_id: 22, image: 'https://a.espncdn.com/i/leaguelogos/soccer/500/2341.png' },
+  { slug: 'fra.1',   name: 'Ligue 1',        category_id: 22, image: 'https://a.espncdn.com/i/leaguelogos/soccer/500/9.png' },
+  { slug: 'ger.1',   name: 'Bundesliga',     category_id: 22, image: 'https://a.espncdn.com/i/leaguelogos/soccer/500/10.png' },
+  { slug: 'ita.1',   name: 'Serie A',        category_id: 22, image: 'https://a.espncdn.com/i/leaguelogos/soccer/500/12.png' },
+  { slug: 'jpn.1',   name: 'J.League',       category_id: 22, image: 'https://a.espncdn.com/i/leaguelogos/soccer/500/2199.png' },
+  { slug: 'bra.1',   name: 'Brasileirão',    category_id: 22, image: 'https://a.espncdn.com/i/leaguelogos/soccer/500/85.png' },
+  { slug: 'mex.1',   name: 'Liga MX',        category_id: 22, image: 'https://a.espncdn.com/i/leaguelogos/soccer/500/22.png' },
+  { slug: 'usa.1',   name: 'MLS',            category_id: 22, image: 'https://a.espncdn.com/i/leaguelogos/soccer/500/19.png' },
+  { slug: 'uefa.champions_league', name: 'UCL', category_id: 22, image: 'https://a.espncdn.com/i/leaguelogos/soccer/500/2.png' },
   { slug: 'nba',     name: 'NBA',            category_id: 24, sport: 'basketball', image: 'https://a.espncdn.com/i/teamlogos/leagues/500/nba.png' },
   { slug: 'ufc',     name: 'UFC',            category_id: 23, sport: 'mma',        image: 'https://a.espncdn.com/i/teamlogos/leagues/500/ufc.png' },
 ]
@@ -192,14 +196,14 @@ async function handler(req: Request) {
             // @ts-ignore
             event_name: comp.event_name ?? null,
             // @ts-ignore
-            venue: comp.venue ?? null,
+            venue: typeof comp.venue === 'object' ? (comp.venue?.fullName ?? null) : (comp.venue ?? null),
             // @ts-ignore
             broadcast: comp.broadcast ?? null,
           }),
           image_url: league.image ?? null,
           options,
           closes_at: closesAt.toISOString(),
-          card_style: 'bars',
+          card_style: isMMA ? 'bars' : 'football',
         }).select('id').single()
 
         if (error) throw error
