@@ -174,7 +174,10 @@ export default function QuestionCard({ question, initialSaved = false, isPredict
   const isEffectivelyOpen = question.status === 'open' && new Date(question.closes_at) > new Date()
   const urgency = isEffectivelyOpen ? urgencyLevel(question.closes_at) : 'normal'
   const daysLeft = Math.floor((new Date(question.closes_at).getTime() - Date.now()) / 86400000)
-  const isLive = isEffectivelyOpen && daysLeft < 30
+  const hasStream = (() => {
+    try { return !!(JSON.parse(question.description ?? '{}').stream_url) } catch { return false }
+  })()
+  const isLive = isEffectivelyOpen && hasStream
   const borderClass = isHot
     ? 'border-orange-200 shadow-orange-50'
     : urgency === 'critical'

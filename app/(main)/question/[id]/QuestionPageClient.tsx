@@ -441,9 +441,6 @@ export default function QuestionPageClient() {
                   )}
                   <span className="font-semibold">{opt.label}</span>
                 </div>
-                <span className={`text-sm font-medium ${selected ? 'text-gray-300' : 'text-gray-400'}`}>
-                  {odds > 0 ? `${odds.toFixed(2)}x` : `${(100 / options.length).toFixed(0)}%`}
-                </span>
               </button>
             )
           })}
