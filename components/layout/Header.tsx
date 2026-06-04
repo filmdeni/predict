@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -68,8 +67,8 @@ export default function Header() {
     <>
       <header className="sticky top-0 z-40 bg-white border-b border-gray-100 px-4 md:px-6 py-3 flex items-center gap-3">
         {/* Logo — mobile only (hidden on desktop where sidebar shows it) */}
-        <Link href="/feed" className="flex items-center gap-2 flex-shrink-0 md:hidden">
-          <Image src="/images/logopawana.png" alt="Pawana" width={100} height={30} className="h-8 w-auto" />
+        <Link href="/feed" className="flex-shrink-0 md:hidden">
+          <span className="text-lg font-black text-indigo-600 tracking-tight">ภาวนา</span>
         </Link>
 
         {/* Search bar */}

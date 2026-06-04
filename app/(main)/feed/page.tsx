@@ -53,7 +53,7 @@ function DraggableGrid({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {items.map((q, i) => (
         <div
           key={q.id}
@@ -671,17 +671,17 @@ function FeedPage() {
     <div className="max-w-7xl mx-auto">
       <Suspense fallback={null}><ReferralCapture /></Suspense>
 
-      <div className="px-4 md:px-6 pt-4 pb-8 space-y-6">
+      <div className="px-4 md:px-6 pt-4 pb-10">
 
         {/* ── Hero banner (all category only) ── */}
         {category === 'all' && <HeroBanner stats={stats} tickKey={tickKey} />}
 
         {/* ── Category filter ── */}
-        <div className="-mx-4 md:-mx-6">
+        <div className={`-mx-4 md:-mx-6 ${category === 'all' ? 'mt-5' : 'mt-4'}`}>
           <CategoryFilter selected={category} onChange={changeCategory} liveOnly={liveOnly} onLiveToggle={setLiveOnly} />
         </div>
 
-        <div className={hasSidebar ? 'flex gap-5 -mt-2' : 'contents'}>
+        <div className={hasSidebar ? 'flex gap-6 mt-5' : 'mt-5'}>
 
         {/* ── Sidebar sub-nav (desktop, esports/sports only) ── */}
         {hasSidebar && sidebarGroup && (
@@ -729,12 +729,12 @@ function FeedPage() {
           </aside>
         )}
 
-        <div className={hasSidebar ? 'flex-1 min-w-0 space-y-6 pt-2' : 'contents'}>
+        <div className={hasSidebar ? 'flex-1 min-w-0 space-y-6' : 'space-y-6'}>
 
         {loading ? (
           <div className="space-y-6">
             <div className="h-48 bg-white rounded-2xl animate-pulse border border-gray-100" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="h-44 bg-white rounded-xl animate-pulse border border-gray-100" />
               ))}
@@ -759,7 +759,7 @@ function FeedPage() {
                 } : undefined}
                 className={`rounded-2xl transition-all ${isAdmin && trendingDropOver ? 'ring-2 ring-orange-400 bg-orange-50/30 p-2 -m-2' : ''}`}
               >
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-500"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
                     <h2 className="text-sm font-bold text-gray-900">มาแรง</h2>
@@ -809,7 +809,7 @@ function FeedPage() {
 
             {/* ── Top Predictors + Market Overview (2-col on desktop) ── */}
             {category === 'all' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <TopPredictorsRow />
                 <MarketOverview stats={stats} chartData={chartData} />
               </div>
@@ -825,7 +825,7 @@ function FeedPage() {
                   if (q) { draggedQuestionRef.current = null; pinToHero(q) }
                 } : undefined}
               >
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-4">
                   <Users size={16} className="text-gray-500" />
                   <h2 className="text-sm font-bold text-gray-900">
                     {category === 'all' ? 'คนกำลังทาย' : 'ในหมวดนี้'}
@@ -862,12 +862,12 @@ function FeedPage() {
 
             {/* Resolved */}
             {resolved.length > 0 && (
-              <section className="space-y-3">
+              <section className="space-y-4">
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm font-semibold text-gray-500">เฉลยแล้ว</h2>
                   <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{resolved.length}</span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 opacity-70">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 opacity-70">
                   {resolved.map((q, i) => (
                     <div key={q.id} className="animate-fadeInUp" style={{ animationDelay: `${i * 40}ms` }}>
                       <QuestionCard

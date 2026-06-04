@@ -203,7 +203,7 @@ export default function LeaderboardPage() {
         <>
           {/* Podium — items-end bottom-aligns all three; taller card = higher slot */}
           {top3.length >= 3 && (
-            <div className="flex justify-center items-end gap-3 mb-10">
+            <div className="flex justify-center items-end gap-2 sm:gap-3 mb-10 overflow-x-auto pb-1 scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0">
               {PODIUM_ORDER.map(rankIdx => {
                 const u = top3[rankIdx]
                 return u ? <PodiumSlot key={rankIdx} user={u} rank={rankIdx} /> : null
@@ -219,12 +219,18 @@ export default function LeaderboardPage() {
           </div>
 
           {/* Table header */}
-          <div
-            className="grid px-4 py-2 mb-1"
-            style={{ gridTemplateColumns: '44px 1fr 88px 72px 56px 72px' }}
-          >
+          <div className="grid px-4 py-2 mb-1 [grid-template-columns:36px_1fr_80px_64px] sm:[grid-template-columns:44px_1fr_88px_72px_56px_72px]">
             {['#', 'ผู้เล่น', 'คะแนน', 'ทายถูก', 'สตรีค', 'ทาย'].map((h, i) => (
-              <span key={h} className={`text-[11px] font-semibold text-gray-400 ${i > 1 ? 'text-right' : ''}`}>{h}</span>
+              <span
+                key={h}
+                className={[
+                  'text-[11px] font-semibold text-gray-400',
+                  i > 1 ? 'text-right' : '',
+                  i >= 4 ? 'hidden sm:block' : '',
+                ].join(' ')}
+              >
+                {h}
+              </span>
             ))}
           </div>
 
@@ -239,13 +245,13 @@ export default function LeaderboardPage() {
               return (
                 <div
                   key={u.id}
-                  className="grid items-center px-4 py-3 bg-white border border-gray-100 rounded-2xl hover:border-gray-200 hover:shadow-sm transition-all duration-150 animate-fadeInUp"
-                  style={{ gridTemplateColumns: '44px 1fr 88px 72px 56px 72px', animationDelay: `${i * 40}ms` }}
+                  className="grid items-center px-4 py-3 bg-white border border-gray-100 rounded-2xl hover:border-gray-200 hover:shadow-sm transition-all duration-150 animate-fadeInUp [grid-template-columns:36px_1fr_80px_64px] sm:[grid-template-columns:44px_1fr_88px_72px_56px_72px]"
+                  style={{ animationDelay: `${i * 40}ms` }}
                 >
                   <span className="text-[13px] font-bold text-gray-300">#{idx + 1}</span>
 
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <Avatar name={u.display_name} size={36} />
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Avatar name={u.display_name} size={34} />
                     <div className="min-w-0">
                       <p className="text-[13px] font-semibold text-gray-900 truncate leading-tight">{u.display_name}</p>
                       <span
@@ -268,14 +274,14 @@ export default function LeaderboardPage() {
                     </span>
                   </div>
 
-                  <div className="text-right">
+                  <div className="hidden sm:block text-right">
                     {u.win_streak > 0
                       ? <span className="text-[13px] font-bold text-orange-400 flex items-center justify-end gap-0.5"><Flame size={11} />{u.win_streak}</span>
                       : <span className="text-gray-300 text-[13px]">—</span>
                     }
                   </div>
 
-                  <div className="text-right">
+                  <div className="hidden sm:block text-right">
                     <span className="text-[13px] text-gray-500 tabular-nums">{u.correct_predictions}/{u.total_predictions}</span>
                   </div>
                 </div>
