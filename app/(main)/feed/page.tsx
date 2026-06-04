@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense, useRef, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { TrendingUp, Users, ArrowRight, BarChart2, Radio } from 'lucide-react'
+import NewsWidget from '@/components/feed/NewsWidget'
 import { createClient } from '@/lib/supabase/client'
 import { getPoolShares } from '@/lib/game/odds'
 import QuestionCard from '@/components/feed/QuestionCard'
@@ -12,6 +13,7 @@ import LiveActivityTicker from '@/components/feed/LiveActivityTicker'
 import CommunityTicker from '@/components/feed/CommunityTicker'
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import type { Database } from '@/lib/supabase/types'
+import RankAvatar from '@/components/ui/RankAvatar'
 
 const ADMIN_EMAIL = 'zwwzww19192@gmail.com'
 
@@ -185,20 +187,21 @@ function FutureRadarCard({ question, isHot, recentCount, predictedIds }: {
 }
 
 // ── Top Predictors mini row ──────────────────────────────────────────────────
-type TopUser = { id: string; username: string; display_name: string; avatar_url: string | null; correct_predictions: number; total_predictions: number; rank: string }
+type TopUser = { id: string; username: string; display_name: string; avatar_url: string | null; coins: number; correct_predictions: number; total_predictions: number; rank: string }
 
 function TopPredictorsRow() {
+  const [tab, setTab] = useState<'accuracy' | 'coins'>('accuracy')
   const [users, setUsers] = useState<TopUser[]>([])
   const supabase = createClient()
 
   useEffect(() => {
     supabase
       .from('users')
-      .select('id, username, display_name, avatar_url, correct_predictions, total_predictions, rank')
-      .order('correct_predictions', { ascending: false })
+      .select('id, username, display_name, avatar_url, coins, correct_predictions, total_predictions, rank')
+      .order(tab === 'coins' ? 'coins' : 'correct_predictions', { ascending: false })
       .limit(5)
       .then(({ data }) => setUsers((data as TopUser[]) ?? []))
-  }, [])
+  }, [tab])
 
   if (users.length === 0) return null
 
@@ -208,11 +211,26 @@ function TopPredictorsRow() {
         <div className="flex items-center gap-2">
           <span className="text-base">🏆</span>
           <h2 className="text-sm font-bold text-gray-900">นักทายอันดับต้น</h2>
-          <span className="text-xs text-gray-400">แม่นที่สุดเดือนนี้</span>
         </div>
-        <Link href="/leaderboard" className="text-xs text-indigo-600 font-semibold flex items-center gap-0.5 hover:text-indigo-800">
-          ดูทั้งหมด <ArrowRight size={12} />
-        </Link>
+        <div className="flex items-center gap-2">
+          <div className="flex gap-0.5 bg-gray-100 rounded-full p-0.5">
+            <button
+              onClick={() => setTab('accuracy')}
+              className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium transition-all ${tab === 'accuracy' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
+            >
+              ความแม่น
+            </button>
+            <button
+              onClick={() => setTab('coins')}
+              className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium transition-all ${tab === 'coins' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
+            >
+              คะแนน
+            </button>
+          </div>
+          <Link href="/leaderboard" className="text-xs text-indigo-600 font-semibold flex items-center gap-0.5 hover:text-indigo-800">
+            ดูทั้งหมด <ArrowRight size={12} />
+          </Link>
+        </div>
       </div>
 
       <div className="flex items-end gap-4 overflow-x-auto pb-1 scrollbar-none">
@@ -224,19 +242,26 @@ function TopPredictorsRow() {
           return (
             <Link key={u.id} href={`/profile/${u.username}`} className="flex flex-col items-center gap-1.5 flex-shrink-0 hover:opacity-80 transition-opacity">
               <div className="relative">
-                <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-lg font-bold text-indigo-700 border-2 border-white shadow-sm">
-                  {u.avatar_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={u.avatar_url} alt={u.display_name} className="w-full h-full rounded-full object-cover" />
-                  ) : (
-                    (u.display_name ?? u.username ?? '?')[0].toUpperCase()
-                  )}
-                </div>
+                <RankAvatar
+                  avatarUrl={u.avatar_url}
+                  displayName={u.display_name}
+                  rank={u.rank}
+                  size="sm"
+                />
                 <span className="absolute -top-1 -left-1 text-sm">{MEDAL[i] ?? `${i + 1}`}</span>
               </div>
               <p className="text-xs font-semibold text-gray-800 text-center max-w-[60px] truncate">{u.display_name?.split(' ')[0] ?? u.username}</p>
-              <p className="text-xs font-bold text-green-600">{accuracy}%</p>
-              <p className="text-[10px] text-gray-400">ความแม่น</p>
+              {tab === 'accuracy' ? (
+                <>
+                  <p className="text-xs font-bold text-green-600">{accuracy}%</p>
+                  <p className="text-[10px] text-gray-400">ความแม่น</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs font-bold text-amber-500">{u.coins.toLocaleString()}</p>
+                  <p className="text-[10px] text-gray-400">คะแนน</p>
+                </>
+              )}
             </Link>
           )
         })}
@@ -348,6 +373,8 @@ function HeroBanner({ stats, tickKey }: {
     </div>
   )
 }
+
+// ── News Section — rendered by NewsWidget component ──────────────────────────
 
 // ── Referral capture ─────────────────────────────────────────────────────────
 function ReferralCapture() {
@@ -829,6 +856,9 @@ function FeedPage() {
                 />
               </section>
             )}
+
+            {/* ── News Section ── */}
+            {category === 'all' && <NewsWidget />}
 
             {/* Resolved */}
             {resolved.length > 0 && (
