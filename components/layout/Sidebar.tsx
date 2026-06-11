@@ -3,9 +3,10 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { Home, Trophy, Clock, PlusCircle, HelpCircle, LogOut, ChevronDown, ChevronUp } from 'lucide-react'
+import { Home, Trophy, Clock, PlusCircle, HelpCircle, LogOut, ChevronDown, ChevronUp, Wallet } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { RANKS } from '@/lib/game/ranks'
+import { hasVault } from '@/lib/crypto/pinVault'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import type { ReactNode } from 'react'
 import WeatherCard from './WeatherCard'
@@ -29,6 +30,9 @@ export default function Sidebar({ priceTicker }: { priceTicker?: ReactNode }) {
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [showWidgets, setShowWidgets] = useState(true)
+  // Fixed-cost tool: only surface its menu on devices where the user set up a PIN
+  const [showFixedCost, setShowFixedCost] = useState(false)
+  useEffect(() => { setShowFixedCost(hasVault()) }, [pathname])
 
   const supabase = createClient()
 
@@ -64,7 +68,12 @@ export default function Sidebar({ priceTicker }: { priceTicker?: ReactNode }) {
 
       {/* Navigation */}
       <nav className="px-3 space-y-0.5 flex-shrink-0">
-        {[...NAV_LINKS, { href: '/submit', icon: PlusCircle, label: 'ตั้งคำถาม' }, { href: '/how-to-play', icon: HelpCircle, label: 'วิธีเล่น' }].map(({ href, icon: Icon, label }) => {
+        {[
+          ...NAV_LINKS,
+          { href: '/submit', icon: PlusCircle, label: 'ตั้งคำถาม' },
+          ...(showFixedCost ? [{ href: '/fixed-cost', icon: Wallet, label: 'คำนวณค่าใช้จ่าย' }] : []),
+          { href: '/how-to-play', icon: HelpCircle, label: 'วิธีเล่น' },
+        ].map(({ href, icon: Icon, label }) => {
           const active = href === '/feed'
             ? pathname === href || pathname.startsWith('/feed')
             : pathname.startsWith(href)

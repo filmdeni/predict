@@ -4,10 +4,11 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Search, ShieldCheck } from 'lucide-react'
+import { Search, ShieldCheck, Wallet } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 import SearchModal from './SearchModal'
 import NotificationBell from './NotificationBell'
+import { hasVault } from '@/lib/crypto/pinVault'
 
 const ADMIN_EMAIL = 'zwwzww19192@gmail.com'
 
@@ -15,6 +16,8 @@ export default function Header() {
   const [user, setUser] = useState<User | null>(null)
   const [coins, setCoins] = useState<number | null>(null)
   const [showSearch, setShowSearch] = useState(false)
+  const [showFixedCost, setShowFixedCost] = useState(false)
+  useEffect(() => { setShowFixedCost(hasVault()) }, [])
   const router = useRouter()
   const supabase = createClient()
 
@@ -90,6 +93,17 @@ export default function Header() {
             >
               <ShieldCheck size={13} />
               Admin
+            </Link>
+          )}
+
+          {/* Fixed-cost tool — mobile only, and only after the user set up a PIN on this device */}
+          {showFixedCost && (
+            <Link
+              href="/fixed-cost"
+              aria-label="คำนวณค่าใช้จ่าย"
+              className="md:hidden p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-indigo-600 transition-colors"
+            >
+              <Wallet size={18} />
             </Link>
           )}
 
